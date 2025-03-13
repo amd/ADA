@@ -15,27 +15,27 @@ const (
 )
 
 type AddEventReq struct {
-	RedfishServerIP   string
-	SlurmNodeName     string
-	Severity          string
-	Action            string
-	DrainReasonPrefix string
-	MessageId         string
-	Message           string
-	ExcludeStr        string
-	ScontrolPath      string
+	RedfishServerIP string
+	SlurmNodeName   string
+	Severity        string
+	Action          string
+	DrainReason     string
+	MessageId       string
+	Message         string
+	ExcludeStr      string
+	ScontrolPath    string
 }
 
 type eventsActionReq struct {
-	redfishServerIP   string
-	slurmNodeName     string
-	severity          string
-	action            string
-	drainReasonPrefix string
-	messageId         string
-	message           string
-	excludeStr        string
-	scontrolPath      string
+	redfishServerIP string
+	slurmNodeName   string
+	severity        string
+	action          string
+	drainReason     string
+	messageId       string
+	message         string
+	excludeStr      string
+	scontrolPath    string
 }
 
 type SlurmQueue struct {
@@ -49,15 +49,12 @@ func InitSlurmQueue(ctx context.Context) *SlurmQueue {
 
 func (q *SlurmQueue) Add(evt AddEventReq) {
 	q.queue <- &eventsActionReq{
-		redfishServerIP:   evt.RedfishServerIP,
-		slurmNodeName:     evt.SlurmNodeName,
-		severity:          evt.Severity,
-		action:            evt.Action,
-		drainReasonPrefix: evt.DrainReasonPrefix,
-		messageId:         evt.MessageId,
-		message:           evt.Message,
-		excludeStr:        evt.ExcludeStr,
-		scontrolPath:      evt.ScontrolPath,
+		redfishServerIP: evt.RedfishServerIP,
+		slurmNodeName:   evt.SlurmNodeName,
+		severity:        evt.Severity,
+		drainReason:     evt.DrainReason,
+		excludeStr:      evt.ExcludeStr,
+		scontrolPath:    evt.ScontrolPath,
 	}
 }
 
@@ -76,15 +73,15 @@ func (q *SlurmQueue) ProcessEventActionQueue() {
 					actionReq.redfishServerIP,
 					actionReq.slurmNodeName,
 					actionReq.severity,
-					actionReq.action).Inc()
-				return
+					"Drain").Inc()
+			} else {
+				metrics.SlurmAPISuccessMetric.
+					WithLabelValues(
+						actionReq.redfishServerIP,
+						actionReq.slurmNodeName,
+						actionReq.severity,
+						"Drain").Inc()
 			}
-			metrics.SlurmAPISuccessMetric.
-				WithLabelValues(
-					actionReq.redfishServerIP,
-					actionReq.slurmNodeName,
-					actionReq.severity,
-					actionReq.action).Inc()
 		}
 	}
 }
@@ -99,17 +96,14 @@ func (q *SlurmQueue) performEventAction(req *eventsActionReq) error {
 		return nil
 	}
 
-	if req.action == Drain {
-		reason := getDrainReasonString(req.drainReasonPrefix, req.message, req.messageId, req.severity)
-		err := DrainNodeWithScontrol(req.slurmNodeName, reason, req.excludeStr, req.scontrolPath)
-		if err != nil {
-			if strings.Contains(err.Error(), ExlcudeReasonSet) {
-				log.Printf("Node not drained: %v", err.Error())
-				return nil
-			}
-			log.Printf("Error draining node: %v", err)
-			return err
+	err := DrainNodeWithScontrol(req.slurmNodeName, req.drainReason, req.excludeStr, req.scontrolPath)
+	if err != nil {
+		if strings.Contains(err.Error(), ExlcudeReasonSet) {
+			log.Printf("Node not drained: %v", err.Error())
+			return nil
 		}
+		log.Printf("Error draining node: %v", err)
+		return err
 	}
 
 	log.Printf("Performed action: %v on slurm node: %v successfully", req.action, req.slurmNodeName)

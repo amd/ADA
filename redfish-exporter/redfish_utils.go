@@ -19,10 +19,16 @@ package main
 import (
 	"fmt"
 	"log"
+	"strconv"
 	"sync"
+	"time"
 
 	"github.com/stmcginnis/gofish"
 	"github.com/stmcginnis/gofish/redfish"
+)
+
+const (
+	PeriodicRetryTime = 30
 )
 
 type RedfishServer struct {
@@ -31,6 +37,12 @@ type RedfishServer struct {
 	Password  string `json:"password"`
 	LoginType string `json:"loginType"`
 	SlurmNode string `json:"slurmNode"`
+}
+
+type RedfishServersCommongConfig struct {
+	HostSuffix string `json:"hostSuffix"`
+	UserName   string `json:"username"`
+	Password   string `json:"password"`
 }
 
 type SubscriptionPayload struct {
@@ -45,13 +57,27 @@ type SubscriptionPayload struct {
 	Context             string                           `json:"Context,omitempty"`
 }
 
+type RedfishSubsciptionFailedData struct {
+	server  RedfishServer
+	payload SubscriptionPayload
+}
+
 // Create a new connection to a redfish server
-func getRedfishClient(server RedfishServer) (*gofish.APIClient, error) {
+func getRedfishClient(server RedfishServer, tlsTimeout string) (*gofish.APIClient, error) {
+	timeOut := 0
+	if tlsTimeout != "" {
+		t, err := strconv.Atoi(tlsTimeout)
+		if err == nil {
+			timeOut = t
+		}
+	}
+
 	clientConfig := gofish.ClientConfig{
-		Endpoint: server.IP,
-		Username: server.Username,
-		Password: server.Password,
-		Insecure: true, // TODO Set Based on login type
+		Endpoint:            server.IP,
+		Username:            server.Username,
+		Password:            server.Password,
+		Insecure:            true, // TODO Set Based on login type
+		TLSHandshakeTimeout: timeOut,
 	}
 
 	c, err := gofish.Connect(clientConfig)
@@ -129,55 +155,55 @@ func createLegacySubscription(eventService *redfish.EventService, SubscriptionPa
 
 // Create subscriptions for all servers and return their URIs
 // Rollback if any subscription attempt fails
-func CreateSubscriptionsForAllServers(redfishServers []RedfishServer, subscriptionPayload SubscriptionPayload) (map[string]string, error) {
-	var wg sync.WaitGroup
-	var mu sync.Mutex // to guard access to the map
-
-	subscriptionMap := make(map[string]string)
-
-	errChan := make(chan error, len(redfishServers))
-
+func CreateSubscriptionsForAllServers(redfishServers []RedfishServer, subscriptionPayload SubscriptionPayload, subscriptionMap map[string]string, mu *sync.Mutex, tlsTimeout string) error {
+	failedSubsChan := make(chan RedfishSubsciptionFailedData)
 	for _, server := range redfishServers {
-		wg.Add(1)
-		go func(server RedfishServer) {
-			defer wg.Done()
-
-			c, err := getRedfishClient(server)
-			if err != nil {
-				errChan <- fmt.Errorf("failed to connect to server %s: %v", server.IP, err)
-				return
-			}
-			defer c.Logout()
-
-			subscriptionURI, err := createSubscription(c, server, subscriptionPayload)
-			if err != nil {
-				errChan <- fmt.Errorf("subscription failed on server %s: %v", server.IP, err)
-				return
-			}
-			mu.Lock()
-			subscriptionMap[server.IP] = subscriptionURI
-			mu.Unlock()
-			log.Printf("Successfully created subscription on Redfish server %s: %s", server.IP, subscriptionURI)
-		}(server)
+		go doSubscription(server, subscriptionPayload, subscriptionMap, mu, failedSubsChan, tlsTimeout)
 	}
 
-	wg.Wait()
-	close(errChan)
+	go periodicSubscriptionRetry(failedSubsChan, subscriptionMap, mu, tlsTimeout)
+	return nil
+}
 
-	// Any error that occurred during the subscription process
-	var allErrors []string
-	for err := range errChan {
-		if err != nil {
-			allErrors = append(allErrors, err.Error())
+func periodicSubscriptionRetry(failedSubsChan chan RedfishSubsciptionFailedData, subscriptionMap map[string]string, mu *sync.Mutex, tlsTimeout string) {
+	failedSubsMap := map[string]RedfishSubsciptionFailedData{}
+
+	ticker := time.NewTicker(PeriodicRetryTime * time.Second)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ticker.C:
+			for ip, data := range failedSubsMap {
+				log.Printf("Retrying subscription for: %v", ip)
+				go doSubscription(data.server, data.payload, subscriptionMap, mu, failedSubsChan, tlsTimeout)
+				delete(failedSubsMap, ip)
+			}
+		case data := <-failedSubsChan:
+			failedSubsMap[data.server.IP] = data
 		}
 	}
+}
 
-	if len(allErrors) > 0 {
-		DeleteSubscriptionsFromAllServers(redfishServers, subscriptionMap)
-		return nil, fmt.Errorf("subscription process encountered errors: %s", allErrors)
+func doSubscription(server RedfishServer, subscriptionPayload SubscriptionPayload, subscriptionMap map[string]string, mu *sync.Mutex, failedSubsChan chan RedfishSubsciptionFailedData, tlsTimeout string) {
+	c, err := getRedfishClient(server, tlsTimeout)
+	if err != nil {
+		log.Printf("[error] failed to connect to server %s: %v", server.IP, err)
+		failedSubsChan <- RedfishSubsciptionFailedData{server: server, payload: subscriptionPayload}
+		return
 	}
+	defer c.Logout()
 
-	return subscriptionMap, nil
+	subscriptionURI, err := createSubscription(c, server, subscriptionPayload)
+	if err != nil {
+		log.Printf("[error] subscription failed on server %s: %v", server.IP, err)
+		failedSubsChan <- RedfishSubsciptionFailedData{server: server, payload: subscriptionPayload}
+		return
+	}
+	mu.Lock()
+	subscriptionMap[server.IP] = subscriptionURI
+	mu.Unlock()
+	log.Printf("Successfully created subscription on Redfish server %s: %s", server.IP, subscriptionURI)
 }
 
 // Delete all event subscriptions stored in the map
@@ -192,7 +218,7 @@ func DeleteSubscriptionsFromAllServers(redfishServers []RedfishServer, subscript
 			defer wg.Done()
 			server := getServerInfo(redfishServers, serverIP)
 
-			c, err := getRedfishClient(server)
+			c, err := getRedfishClient(server, "")
 			if err != nil {
 				log.Printf("Failed to connect to server %s: %v", server.IP, err)
 				return
