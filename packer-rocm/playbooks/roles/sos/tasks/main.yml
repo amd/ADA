@@ -1,0 +1,28 @@
+---
+# tasks file for sos
+
+- name: Install packages
+  become: true
+  tags: ["pkgs", "packages"]
+  ansible.builtin.package:
+    name: "{{ sos_pkgs[ansible_os_family] }}"
+    update_cache: "{{ true if ansible_os_family in ['RedHat', 'Debian'] else omit }}" # these modules behind 'package' will accept this
+
+- name: Install 'xsos'
+  become: true
+  tags: ["xsos"]
+  when: sos_xsos is truthy(convert_bool=True)
+  ansible.builtin.get_url:
+    url: "{{ sos_xsos_url }}"
+    dest: /usr/local/bin/xsos
+    mode: "+x"
+
+- name: Extras
+  become: true
+  tags: ["extras", "extras.d"]
+  loop: "{{ sos_extras | dict2items }}"
+  loop_control: { loop_var: entry }
+  ansible.builtin.copy:
+    dest: "/etc/sos/extras.d/{{ entry.key }}"
+    content: "{{ entry.value | join('\n') }}"
+    mode: "0644" # lint; suggested in case umask is restricted

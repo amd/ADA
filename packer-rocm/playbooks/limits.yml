@@ -1,0 +1,11 @@
+---
+# yamllint disable rule:line-length
+# vim: ft=yaml.ansible
+- name: "Set limits.conf w/ 'gpu_perf_config' Role"
+  hosts: all
+  environment:  # may be superfluous for your environment; mapped through Packer HCL with 'ansible_env_vars'
+    http_proxy: "{{ lookup('ansible.builtin.env', 'http_proxy') | default(omit) }}"
+    https_proxy: "{{ lookup('ansible.builtin.env', 'https_proxy') | default(omit) }}"
+    no_proxy: "{{ lookup('ansible.builtin.env', 'no_proxy') | default(omit) }}"
+  roles:
+    - { role: gpu_perf_config }

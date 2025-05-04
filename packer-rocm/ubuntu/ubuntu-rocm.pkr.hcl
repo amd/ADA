@@ -77,6 +77,26 @@ build {
   }
 
   provisioner "ansible" {
+    playbook_file = "${path.root}/../playbooks/sos.yml"
+    user          = "packer"
+    ansible_env_vars  = ["http_proxy=${var.http_proxy}", "https_proxy=${var.https_proxy}", "no_proxy=${var.no_proxy}"]
+    extra_arguments = [
+      "-e", "ansible_python_interpreter=/usr/bin/python3",
+      "--scp-extra-args", "'-O'"
+    ]
+  }
+
+  provisioner "ansible" {
+    playbook_file = "${path.root}/../playbooks/limits.yml"
+    user          = "packer"
+    ansible_env_vars  = ["http_proxy=${var.http_proxy}", "https_proxy=${var.https_proxy}", "no_proxy=${var.no_proxy}"]
+    extra_arguments = [
+      "-e", "ansible_python_interpreter=/usr/bin/python3",
+      "--scp-extra-args", "'-O'"
+    ]
+  }
+
+  provisioner "ansible" {
     playbook_file = "${path.root}/../playbooks/os_prep.yml"
     user          = "packer"
     ansible_env_vars  = ["http_proxy=${var.http_proxy}", "https_proxy=${var.https_proxy}", "no_proxy=${var.no_proxy}"]

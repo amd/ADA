@@ -1,0 +1,9 @@
+---
+- name: Push configuration files
+  become: true
+  ansible.builtin.copy:
+    src: "{{ item.src }}"
+    dest: "{{ item.dest }}"
+    mode: "{{ item.mode }}"
+  loop:
+    - { src: "10-sre-limits.conf", mode: "0644", dest: "/etc/security/limits.d/10-sre-limits.conf" }

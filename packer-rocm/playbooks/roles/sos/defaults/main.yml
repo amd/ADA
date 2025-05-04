@@ -1,0 +1,15 @@
+---
+# defaults file for sos
+#
+# dictionary of sos/related packages to install, mapped by Ansible fact (ansible_os_family)
+sos_pkgs:
+  Debian: # includes derivatives (eg: Ubuntu, Mint, etc)
+    - sosreport
+  RedHat: # includes derivatives (eg: Fedora, Alma, etc)
+    - sos
+
+# provides '/etc/sos/extras.d' entries. expected to be provided by the user, see README for current example
+sos_extras: {}
+# sosreport examiner
+sos_xsos: true
+sos_xsos_url: "https://github.com/ryran/xsos/raw/master/xsos"
