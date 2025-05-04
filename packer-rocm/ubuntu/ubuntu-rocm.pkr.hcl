@@ -22,9 +22,9 @@ source "qemu" "rocm" {
   efi_drop_efivars = true  # don't place efivars.fd in output artifact
   format          = "raw"  # qcow2 may not be converted. if written to drives, can't be read back/won't find 'curtin'
   headless        = var.hidden
-  shutdown_command       = "sudo -S shutdown -P now"
+  shutdown_command = "sudo -S bash -c \"rm -fv /etc/sudoers.d/packer /etc/sudoers.d/90-cloud-init-users; userdel --remove --force packer; shutdown -P now\""
   ssh_handshake_attempts = 500
-  ssh_username           = "ubuntu"
+  ssh_username           = "packer"
   ssh_password           = "ubuntu"
   ssh_wait_timeout       = "1h"
   ssh_timeout            = "1h"
@@ -78,7 +78,7 @@ build {
 
   provisioner "ansible" {
     playbook_file = "${path.root}/../playbooks/os_prep.yml"
-    user          = "ubuntu"
+    user          = "packer"
     ansible_env_vars  = ["http_proxy=${var.http_proxy}", "https_proxy=${var.https_proxy}", "no_proxy=${var.no_proxy}"]
     extra_arguments = [
       "-e", "ansible_python_interpreter=/usr/bin/python3",  # work around Packer/SSH proxy+client limitations
@@ -89,7 +89,7 @@ build {
 
   provisioner "ansible" {
     playbook_file = "${path.root}/../playbooks/amdgpu_install.yml"
-    user          = "ubuntu"
+    user          = "packer"
     ansible_env_vars  = ["http_proxy=${var.http_proxy}", "https_proxy=${var.https_proxy}", "no_proxy=${var.no_proxy}"]
     extra_arguments = [
       "-e", "ansible_python_interpreter=/usr/bin/python3",
@@ -106,7 +106,7 @@ build {
 
   provisioner "ansible" {
     playbook_file = "${path.root}/../playbooks/tuned.yml"
-    user          = "ubuntu"
+    user          = "packer"
     ansible_env_vars  = ["http_proxy=${var.http_proxy}", "https_proxy=${var.https_proxy}", "no_proxy=${var.no_proxy}"]
     extra_arguments = [
       "-e", "ansible_python_interpreter=/usr/bin/python3",
@@ -116,7 +116,7 @@ build {
 
   provisioner "ansible" {
     playbook_file = "${path.root}/../playbooks/niccli.yml"
-    user          = "ubuntu"
+    user          = "packer"
     ansible_env_vars  = ["http_proxy=${var.http_proxy}", "https_proxy=${var.https_proxy}", "no_proxy=${var.no_proxy}"]
     extra_arguments = [
       "-e", "ansible_python_interpreter=/usr/bin/python3",
@@ -130,7 +130,7 @@ build {
 
   provisioner "ansible" {
     playbook_file = "${path.root}/../playbooks/tuned.yml"
-    user          = "ubuntu"
+    user          = "packer"
     ansible_env_vars  = ["http_proxy=${var.http_proxy}", "https_proxy=${var.https_proxy}", "no_proxy=${var.no_proxy}"]
     extra_arguments = [  
       "-e", "ansible_python_interpreter=/usr/bin/python3",

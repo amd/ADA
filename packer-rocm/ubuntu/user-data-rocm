@@ -3,7 +3,7 @@ autoinstall:
   version: 1
   identity:
     hostname: ubuntu
-    username: ubuntu
+    username: packer
     password: "$6$5OcQlL5Sfjzsczoq$i8LnaFro3xOZ8mZ258DYtGMeWymBdLHts37F7LS.eV4SGe8cGWGWbcHQ/423aijQgMCGIKLMvEQCHpD2pSPKV0"
   packages:
     # support potential use of the ansible-local provisioner
@@ -55,6 +55,6 @@ autoinstall:
       # reset-partition: true  # likely impractical with ROCm/amdgpu/etc, multiplies usage
   late-commands:
   # 'execute_command' in 'ubuntu-rocm.pkr.hcl' depends on this sudo rule
-    - echo 'ubuntu ALL=(ALL) NOPASSWD:ALL' > /target/etc/sudoers.d/ubuntu
+    - echo 'packer ALL=(ALL) NOPASSWD:ALL' > /target/etc/sudoers.d/packer
   package_update: true
   package_upgrade: true
