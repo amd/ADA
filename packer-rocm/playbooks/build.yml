@@ -131,6 +131,14 @@
           ansible.builtin.set_fact:
             packer_vars: "{{ packer_rocm_hcl_awk.stdout_lines | replace('\"', '') }}"
 
+        - name: "Run 'packer init', ensure plugin coverage"
+          ansible.builtin.command:
+            cmd: 'packer init .'
+            chdir: "{{ (workdir, packer_dist) | path_join }}"
+          environment:
+            PACKER_LOG: '1'  # wanted as str
+          changed_when: false  # command w/ assumed changes: report 'ok' or failure
+
         - name: "Run 'packer build', create '{{ _creates }}'"
           ansible.builtin.command:
             cmd: >
