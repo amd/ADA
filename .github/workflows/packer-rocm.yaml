@@ -37,7 +37,7 @@ jobs:
 
       - name: ansible-lint
         run: |
-          ansible-lint --profile production --parseable --nocolor packer-rocm/
+          ansible-lint --profile production --parseable --nocolor --exclude packer-rocm/packer-maas/ packer-rocm/
 
 # Not yet validating HCL, challenge:
 # Many out-of-place references to 'packer-maas' until playbook-run; Packer is strict
