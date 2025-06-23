@@ -235,7 +235,7 @@ def check_power_supplies(bmc_ip, bmc_username, bmc_password):
                 print(f"[OK]   {name}: State={state}, Health={health}")
 
     # If more than half the PSU are failing
-    if total_psu / 2 > failing_psu:
+    if total_psu / 2 < failing_psu:
         log(
             "More than half power supplies are missing connection or are faulty which is most likely causing system issues"
         )
