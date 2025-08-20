@@ -171,6 +171,37 @@ func (s *Server) handleConnection(AppConfig Config, conn net.Conn) {
 	}
 }
 
+func getDrainReasonPrefix(info EventInfo) string {
+	return info.DrainReasonPrefix + ": " + info.Category + ": " + info.Subcategory
+}
+
+func isTriggerEvent(evt Event, config Config) (bool, string) {
+	tInfoMap := config.TriggerEvents
+
+	if eInfoMap, ok := tInfoMap[evt.Severity]; !ok {
+		return false, ""
+	} else {
+		if eInfo, ok1 := eInfoMap[evt.MessageId]; !ok1 {
+			return false, ""
+		} else {
+			if len(eInfo) == 1 {
+				return true, getDrainReasonPrefix(eInfo[0])
+			} else {
+				for _, info := range eInfo {
+					strs := strings.Split(info.UniqueString, "|")
+					for _, str := range strs {
+						if strings.Contains(evt.Message, str) == true {
+							return true, getDrainReasonPrefix(info)
+						}
+					}
+
+				}
+			}
+		}
+	}
+	return false, ""
+}
+
 func (s *Server) processRequest(AppConfig Config, conn net.Conn, req *http.Request, eventCount *int, dataBuffer *[]byte) error {
 	// Extract method, headers, and payload
 	method := req.Method
@@ -217,19 +248,26 @@ func (s *Server) processRequest(AppConfig Config, conn net.Conn, req *http.Reque
 		log.Printf("Message ID: %s", messageId)
 		log.Printf("Message Args: %v", messageArgs)
 		log.Printf("Origin Of Condition: %s", originOfCondition)
-		for _, triggerEvent := range AppConfig.TriggerEvents {
-			if severity == triggerEvent.Severity {
-				log.Printf("Matched Trigger Event: %s with action %s", triggerEvent.Severity, triggerEvent.Action)
-				// Sending event belongs to redfish_utils. Each server may have different slurm node associated, and redfish_servers has the info/map.
-				if s.slurmQueue != nil {
-					redfishServerInfo := getServerInfoByIP(AppConfig.RedfishServers, ip)
-					if len(strings.TrimSpace(redfishServerInfo.SlurmNode)) == 0 {
-						log.Printf("failed to get the slurm node name, cannot perform action: %v", triggerEvent.Action)
-						break
-					}
-					s.slurmQueue.Add(redfishServerInfo.IP, redfishServerInfo.SlurmNode, triggerEvent.Severity, triggerEvent.Action)
+
+		trigger, drainReason := isTriggerEvent(event, AppConfig)
+		if trigger == true {
+			log.Printf("Matched Trigger Event: %s | messageId: %s | message: %s", event.Severity, event.MessageId, event.Message)
+			// Sending event belongs to redfish_utils. Each server may have different slurm node associated, and redfish_servers has the info/map.
+			if s.slurmQueue != nil {
+				redfishServerInfo := getServerInfoByIP(AppConfig.RedfishServers, ip)
+				if len(strings.TrimSpace(redfishServerInfo.SlurmNode)) == 0 {
+					log.Println("failed to get the slurm node name, cannot perform drain action")
+					continue
 				}
-				break
+				evt := slurm.AddEventReq{
+					RedfishServerIP: redfishServerInfo.IP,
+					SlurmNodeName:   redfishServerInfo.SlurmNode,
+					Severity:        event.Severity,
+					DrainReason:     drainReason,
+					ExcludeStr:      AppConfig.SlurmDrainExcludeStr,
+					ScontrolPath:    AppConfig.SlurmScontrolPath,
+				}
+				s.slurmQueue.Add(evt)
 			}
 		}
 	}
