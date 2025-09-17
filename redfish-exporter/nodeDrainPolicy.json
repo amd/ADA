@@ -1,0 +1,612 @@
+[
+    {
+        "Category": "Firmware Update",
+        "SubCategory": "Verification Failed",
+        "MessageRegistry": "Update.1.0.1",
+        "MessageId": "VerificationFailed",
+        "UniqueString": "",
+        "Severity": "Critical",
+        "DrainReasonPrefix": "Reboot needed",
+        "Enable": true
+    },
+    {
+        "Category": "Firmware Update",
+        "SubCategory": "Transfer failed",
+        "MessageRegistry": "Update.1.0.1",
+        "MessageId": "TransferFailed",
+        "UniqueString": "",
+        "Severity": "Critical",
+        "DrainReasonPrefix": "Reboot needed",
+        "Enable": true
+    },
+    {
+        "Category": "Firmware Update",
+        "SubCategory": "Apply on component failed",
+        "MessageRegistry": "Update.1.0.1",
+        "MessageId": "ApplyFailed",
+        "UniqueString": "",
+        "Severity": "Critical",
+        "DrainReasonPrefix": "Reboot needed",
+        "Enable": true
+    },
+    {
+        "Category": "Firmware Update",
+        "SubCategory": "Activate Failed",
+        "MessageRegistry": "Update.1.0.1",
+        "MessageId": "ActivateFailed",
+        "UniqueString": "",
+        "Severity": "Critical",
+        "DrainReasonPrefix": "Reboot needed",
+        "Enable": true
+    },
+    {
+        "Category": "Firmware Update",
+        "SubCategory": "Bundle Check Failure",
+        "MessageRegistry": "OpenBMC.0.2.0",
+        "MessageId": "BundleCheckFailure",
+        "UniqueString": "",
+        "Severity": "Warning",
+        "DrainReasonPrefix": "Reboot needed",
+        "Enable": true
+    },
+    {
+        "Category": "Firmware Update",
+        "SubCategory": "Firmware Update Failed",
+        "MessageRegistry": "OpenBMC.0.2.0",
+        "MessageId": "FirmwareUpdateFailed",
+        "UniqueString": "",
+        "Severity": "Warning",
+        "DrainReasonPrefix": "Reboot needed",
+        "Enable": true
+    },
+    {
+        "Category": "Firmware Update",
+        "SubCategory": "Verification Failed at EROT",
+        "MessageRegistry": "Update.1.0.1",
+        "MessageId": "VerificationFailedOEM",
+        "UniqueString": "",
+        "Severity": "Warning",
+        "DrainReasonPrefix": "Reboot needed",
+        "Enable": true
+    },
+    {
+        "Category": "Temperature sensor threshold Alerts",
+        "SubCategory": "Upper Fatal",
+        "MessageRegistry": "SensorEvent.1.0.0",
+        "MessageId": "ReadingAboveUpperFatalThresholdOEM",
+        "UniqueString": "TEMP",
+        "Severity": "Critical",
+        "DrainReasonPrefix": "Reboot needed",
+        "Enable": true
+    },
+    {
+        "Category": "Temperature sensor threshold Alerts",
+        "SubCategory": "Upper Critical",
+        "MessageRegistry": "SensorEvent.1.0.0",
+        "MessageId": "ReadingAboveUpperCriticalThresholdOEM",
+        "UniqueString": "TEMP",
+        "Severity": "Critical",
+        "DrainReasonPrefix": "Reboot needed",
+        "Enable": true
+    },
+    {
+        "Category": "Temperature sensor threshold Alerts",
+        "SubCategory": "Upper Caution",
+        "MessageRegistry": "SensorEvent.1.0.0",
+        "MessageId": "ReadingAboveUpperCautionThresholdOEM",
+        "UniqueString": "TEMP",
+        "Severity": "Warning",
+        "DrainReasonPrefix": "Reboot needed",
+        "Enable": true
+    },
+    {
+        "Category": "Temperature sensor threshold Alerts",
+        "SubCategory": "Lower Fatal",
+        "MessageRegistry": "SensorEvent.1.0.0",
+        "MessageId": "ReadingBelowLowerFatalThresholdOEM",
+        "UniqueString": "TEMP",
+        "Severity": "Critical",
+        "DrainReasonPrefix": "Reboot needed",
+        "Enable": true
+    },
+    {
+        "Category": "Temperature sensor threshold Alerts",
+        "SubCategory": "Lower Caution",
+        "MessageRegistry": "SensorEvent.1.0.0",
+        "MessageId": "ReadingBelowLowerCautionThresholdOEM",
+        "UniqueString": "",
+        "Severity": "Warning",
+        "DrainReasonPrefix": "Reboot needed",
+        "Enable": true
+    },
+    {
+        "Category": "Voltage Sensor threshold Alerts",
+        "SubCategory": "Upper Fatal",
+        "MessageRegistry": "SensorEvent.1.0.0",
+        "MessageId": "ReadingAboveUpperFatalThresholdOEM",
+        "UniqueString": "VOLTAGE",
+        "Severity": "Critical",
+        "DrainReasonPrefix": "Reboot needed",
+        "Enable": true
+    },
+    {
+        "Category": "Voltage Sensor threshold Alerts",
+        "SubCategory": "Upper Critical",
+        "MessageRegistry": "SensorEvent.1.0.0",
+        "MessageId": "ReadingAboveUpperCriticalThresholdOEM",
+        "UniqueString": "VOLTAGE",
+        "Severity": "Critical",
+        "DrainReasonPrefix": "Reboot needed",
+        "Enable": true
+    },
+    {
+        "Category": "Voltage Sensor threshold Alerts",
+        "SubCategory": "Upper Caution",
+        "MessageRegistry": "SensorEvent.1.0.0",
+        "MessageId": "ReadingAboveUpperCautionThresholdOEM",
+        "UniqueString": "VOLTAGE",
+        "Severity": "Warning",
+        "DrainReasonPrefix": "Reboot needed",
+        "Enable": true
+    },
+    {
+        "Category": "Voltage Sensor threshold Alerts",
+        "SubCategory": "Lower Fatal",
+        "MessageRegistry": "SensorEvent.1.0.0",
+        "MessageId": "ReadingBelowLowerFatalThresholdOEM",
+        "UniqueString": "VOLTAGE",
+        "Severity": "Critical",
+        "DrainReasonPrefix": "Reboot needed",
+        "Enable": true
+    },
+    {
+        "Category": "Current Sensor threshold Alerts",
+        "SubCategory": "Upper Fatal",
+        "MessageRegistry": "SensorEvent.1.0.0",
+        "MessageId": "ReadingAboveUpperFatalThresholdOEM",
+        "UniqueString": "CURRENT",
+        "Severity": "Critical",
+        "DrainReasonPrefix": "Reboot needed",
+        "Enable": true
+    },
+    {
+        "Category": "Current Sensor threshold Alerts",
+        "SubCategory": "Upper Critical",
+        "MessageRegistry": "SensorEvent.1.0.0",
+        "MessageId": "ReadingAboveUpperCriticalThresholdOEM",
+        "UniqueString": "CURRENT",
+        "Severity": "Critical",
+        "DrainReasonPrefix": "Reboot needed",
+        "Enable": true
+    },
+    {
+        "Category": "Current Sensor threshold Alerts",
+        "SubCategory": "Upper Caution",
+        "MessageRegistry": "SensorEvent.1.0.0",
+        "MessageId": "ReadingAboveUpperCautionThresholdOEM",
+        "UniqueString": "CURRENT",
+        "Severity": "Warning",
+        "DrainReasonPrefix": "Reboot needed",
+        "Enable": true
+    },
+    {
+        "Category": "Current Sensor threshold Alerts",
+        "SubCategory": "Lower Fatal",
+        "MessageRegistry": "SensorEvent.1.0.0",
+        "MessageId": "ReadingBelowLowerFatalThresholdOEM",
+        "UniqueString": "CURRENT",
+        "Severity": "Critical",
+        "DrainReasonPrefix": "Reboot needed",
+        "Enable": true
+    },
+    {
+        "Category": "Memory CE threshold Alerts",
+        "SubCategory": "Upper Caution (HAS AdditionalDataURI, pointing to CPER LOG)",
+        "MessageRegistry": "SensorEvent.1.0.0",
+        "MessageId": "ReadingAboveUpperCautionThreshold",
+        "UniqueString": "",
+        "Severity": "Warning",
+        "DrainReasonPrefix": "Reboot needed",
+        "Enable": true
+    },
+    {
+        "Category": "I2C/SPI Comm Errors",
+        "SubCategory": "SPI Errors",
+        "MessageRegistry": "ResourceEvent.1.2.1",
+        "MessageId": "ResourceErrorsDetected",
+        "UniqueString": "SPI",
+        "Severity": "Warning",
+        "DrainReasonPrefix": "Reboot needed",
+        "Enable": true
+    },
+    {
+        "Category": "I2C/SPI Comm Errors",
+        "SubCategory": "I2C2-failure/ interface hang [SMC -> OAM GPU, Retimer]",
+        "MessageRegistry": "ResourceEvent.1.2.1",
+        "MessageId": "ResourceErrorsDetected",
+        "UniqueString": "I2C",
+        "Severity": "Warning",
+        "DrainReasonPrefix": "Reboot needed",
+        "Enable": true
+    },
+    {
+        "Category": "I2C/SPI Comm Errors",
+        "SubCategory": "EROT config failure",
+        "MessageRegistry": "ResourceEvent.1.2.1",
+        "MessageId": "ResourceSelfTestFailed",
+        "UniqueString": "Erot|eRoT",
+        "Severity": "Critical",
+        "DrainReasonPrefix": "Reboot needed",
+        "Enable": true
+    },
+    {
+        "Category": "I2C/SPI Comm Errors",
+        "SubCategory": "ROT Fatal failure after retries",
+        "MessageRegistry": "ResourceEvent.1.2.1",
+        "MessageId": "ResourceRetryFailOEM",
+        "UniqueString": "",
+        "Severity": "Critical",
+        "DrainReasonPrefix": "Reboot needed",
+        "Enable": true
+    },
+    {
+        "Category": "Component fault/failure",
+        "SubCategory": "OAM (HBM, XGMI) VR failure, GPU Module VR failure, UBB VR failure",
+        "MessageRegistry": "ResourceEvent.1.2.1",
+        "MessageId": "ResourceStatusChangedCriticalOEM",
+        "UniqueString": "_STATUS",
+        "Severity": "Critical",
+        "DrainReasonPrefix": "Reboot needed",
+        "Enable": true
+    },
+    {
+        "Category": "Component fault/failure",
+        "SubCategory": "SMC FPGA State, UBB FPGA state",
+        "MessageRegistry": "ResourceEvent.1.2.1",
+        "MessageId": "ResourceErrorsDetectedOEM",
+        "UniqueString": "FPGA",
+        "Severity": "Critical",
+        "DrainReasonPrefix": "Reboot needed",
+        "Enable": true
+    },
+    {
+        "Category": "Component fault/failure",
+        "SubCategory": "Retimer Link disabled",
+        "MessageRegistry": "ResourceEvent.1.2.1",
+        "MessageId": "ResourceStatusChangedCriticalOEM",
+        "UniqueString": "Disabled",
+        "Severity": "Critical",
+        "DrainReasonPrefix": "Reboot needed",
+        "Enable": true
+    },
+    {
+        "Category": "Component fault/failure",
+        "SubCategory": "EROT non-fatal error",
+        "MessageRegistry": "ResourceEvent.1.2.1",
+        "MessageId": "ResourceEROTNonFatalErrorsOEM",
+        "UniqueString": "",
+        "Severity": "Warning",
+        "DrainReasonPrefix": "Reboot needed",
+        "Enable": true
+    },
+    {
+        "Category": "Component fault/failure",
+        "SubCategory": "EROT fatal error",
+        "MessageRegistry": "ResourceEvent.1.2.1",
+        "MessageId": "ResourceEROTFatalErrorsOEM",
+        "UniqueString": "",
+        "Severity": "Critical",
+        "DrainReasonPrefix": "Reboot needed",
+        "Enable": true
+    },
+    {
+        "Category": "Component fault/failure",
+        "SubCategory": "HSC/UBB PGOOD",
+        "MessageRegistry": "ResourceEvent.1.2.1",
+        "MessageId": "ResourceStatusChangedCriticalOEM",
+        "UniqueString": "HSC|UBB",
+        "Severity": "Critical",
+        "DrainReasonPrefix": "Reboot needed",
+        "Enable": true
+    },
+    {
+        "Category": "GPU Error Events",
+        "SubCategory": "PCIe Link Width",
+        "MessageRegistry": "ResourceEvent.1.2.1",
+        "MessageId": "ResourcePerfChange",
+        "UniqueString": "Link Width",
+        "Severity": "Critical",
+        "DrainReasonPrefix": "Reboot needed",
+        "Enable": true
+    },
+    {
+        "Category": "GPU Error Events",
+        "SubCategory": "Pcie Link Speed",
+        "MessageRegistry": "ResourceEvent.1.2.1",
+        "MessageId": "ResourcePerfChange",
+        "UniqueString": "Link Speed",
+        "Severity": "Critical",
+        "DrainReasonPrefix": "Reboot needed",
+        "Enable": true
+    },
+    {
+        "Category": "GPU Error Events",
+        "SubCategory": "OAM PGOOD",
+        "MessageRegistry": "ResourceEvent.1.2.1",
+        "MessageId": "ResourceStatusChangedCriticalOEM",
+        "UniqueString": "OAM",
+        "Severity": "Critical",
+        "DrainReasonPrefix": "Reboot needed",
+        "Enable": true
+    },
+    {
+        "Category": "GPU Error Events",
+        "SubCategory": "OAM CTF",
+        "MessageRegistry": "ResourceEvent.1.2.1",
+        "MessageId": "TemperatureAssertCriticalFaultOEM",
+        "UniqueString": "",
+        "Severity": "Critical",
+        "DrainReasonPrefix": "Reboot needed",
+        "Enable": true
+    },
+    {
+        "Category": "GPU Error Events",
+        "SubCategory": "GPU Throttle state",
+        "MessageRegistry": "ResourceEvent.1.2.1",
+        "MessageId": "ResourceStatusChangedCritical",
+        "UniqueString": "",
+        "Severity": "Critical",
+        "DrainReasonPrefix": "Reboot needed",
+        "Enable": true
+    },
+    {
+        "Category": "GPU Error Events",
+        "SubCategory": "GPU Throttle state",
+        "MessageRegistry": "ResourceEvent.1.2.1",
+        "MessageId": "ResourceStatusChangedWarning",
+        "UniqueString": "",
+        "Severity": "Warning",
+        "DrainReasonPrefix": "Reboot needed",
+        "Enable": true
+    },
+    {
+        "Category": "GPU Error Events",
+        "SubCategory": "GPU boot failed (HAS AdditionalDataURI, pointing to CPER LOG file)",
+        "MessageRegistry": "ResourceEvent.1.2.1",
+        "MessageId": "ResourceSelfTestFailed",
+        "UniqueString": "OAM_",
+        "Severity": "Critical",
+        "DrainReasonPrefix": "Reboot needed",
+        "Enable": true
+    },
+    {
+        "Category": "GPU Error Events",
+        "SubCategory": "UC Not-Fatal (inlcuding HBM & XGMI) (HAS AdditionalDataURI, pointing to CPER LOG)",
+        "MessageRegistry": "ResourceEvent.1.2.1",
+        "MessageId": "ResourceErrorsDetected",
+        "UniqueString": "OAM",
+        "Severity": "Warning",
+        "DrainReasonPrefix": "Reboot needed",
+        "Enable": true
+    },
+    {
+        "Category": "GPU Error Events",
+        "SubCategory": "GPU Fatal Error (inlcuding HBM & XGMI) (HAS AdditionalDataURI, pointing to CPER LOG)",
+        "MessageRegistry": "ResourceEvent.1.2.1",
+        "MessageId": "ResourceErrorsDetectedOEM",
+        "UniqueString": "Fatal error",
+        "Severity": "Critical",
+        "DrainReasonPrefix": "Reboot needed",
+        "Enable": true
+    },
+    {
+        "Category": "GPU Error Events",
+        "SubCategory": "Misplaced OAM",
+        "MessageRegistry": "ResourceEvent.1.2.1",
+        "MessageId": "ResourceIncompatibleLocationOEM",
+        "UniqueString": "",
+        "Severity": "Critical",
+        "DrainReasonPrefix": "Reboot needed",
+        "Enable": true
+    },
+    {
+        "Category": "GPU Error Events",
+        "SubCategory": "OAM/GPU physically missing",
+        "MessageRegistry": "Base.1.8.1",
+        "MessageId": "\"ResourceNotFound\"",
+        "UniqueString": "",
+        "Severity": "Critical",
+        "DrainReasonPrefix": "Reboot needed",
+        "Enable": true
+    },
+    {
+        "Category": "GPU Error Events",
+        "SubCategory": "GPU Max Bad page count (HAS AdditionalDataURI, pointing to CPER LOG)",
+        "MessageRegistry": "ResourceEvent.1.2.1",
+        "MessageId": "ResourceErrorsDetectedOEM",
+        "UniqueString": "HBM",
+        "Severity": "Critical",
+        "DrainReasonPrefix": "Reboot needed",
+        "Enable": true
+    },
+    {
+        "Category": "GPU Error Events",
+        "SubCategory": "GPU Triggers CTF event",
+        "MessageRegistry": "OpenBMC.0.2.0",
+        "MessageId": "GPUTriggerCTF",
+        "UniqueString": "",
+        "Severity": "Critical",
+        "DrainReasonPrefix": "Reboot needed",
+        "Enable": true
+    },
+    {
+        "Category": "GPU Error Events",
+        "SubCategory": "OAM_X with PartNumber xxx is Unrecognized",
+        "MessageRegistry": "ResourceEvent.1.2.1",
+        "MessageId": "ResourceUnrecognizedOEM",
+        "UniqueString": "",
+        "Severity": "Critical",
+        "DrainReasonPrefix": "Reboot needed",
+        "Enable": true
+    },
+    {
+        "Category": "Secure Boot notifications",
+        "SubCategory": "Secure boot failure",
+        "MessageRegistry": "ResourceEvent.1.2.1",
+        "MessageId": "ResourceSelfTestFailed",
+        "UniqueString": "secure boot failure",
+        "Severity": "Critical",
+        "DrainReasonPrefix": "Reboot needed",
+        "Enable": true
+    },
+    {
+        "Category": "Secure Boot notifications",
+        "SubCategory": "Component Boot Failure",
+        "MessageRegistry": "OpenBMC.0.2.0",
+        "MessageId": "BootFailure",
+        "UniqueString": "",
+        "Severity": "Warning",
+        "DrainReasonPrefix": "Reboot needed",
+        "Enable": true
+    },
+    {
+        "Category": "Secure Boot notifications",
+        "SubCategory": "Revocation Failed",
+        "MessageRegistry": "ResourceEvent.1.2.1",
+        "MessageId": "RevocationFailedOEM",
+        "UniqueString": "",
+        "Severity": "Warning",
+        "DrainReasonPrefix": "Reboot needed",
+        "Enable": true
+    },
+    {
+        "Category": "Secure Boot notifications",
+        "SubCategory": "",
+        "MessageRegistry": "OpenBMC.0.2.0",
+        "MessageId": "SecureFWUnexpectedRespWarning",
+        "UniqueString": "",
+        "Severity": "Warning",
+        "DrainReasonPrefix": "Reboot needed",
+        "Enable": true
+    },
+    {
+        "Category": "Auto Recovery",
+        "SubCategory": "Auto Recovery related events",
+        "MessageRegistry": "OpenBMC.0.2.0",
+        "MessageId": "AutomaticRecoveryTriggered",
+        "UniqueString": "",
+        "Severity": "Warning",
+        "DrainReasonPrefix": "Reboot needed",
+        "Enable": true
+    },
+    {
+        "Category": "Auto Recovery",
+        "SubCategory": "Auto Recovery related events",
+        "MessageRegistry": "OpenBMC.0.2.0",
+        "MessageId": "AutoFWCopyFailure",
+        "UniqueString": "",
+        "Severity": "Critical",
+        "DrainReasonPrefix": "Reboot needed",
+        "Enable": true
+    },
+    {
+        "Category": "Auto Recovery",
+        "SubCategory": "Auto Recovery related events",
+        "MessageRegistry": "OpenBMC.0.2.0",
+        "MessageId": "AutomaticRecoveryFailureCritical",
+        "UniqueString": "",
+        "Severity": "Critical",
+        "DrainReasonPrefix": "Reboot needed",
+        "Enable": true
+    },
+    {
+        "Category": "Power Status",
+        "SubCategory": "UBB Power Status",
+        "MessageRegistry": "OpenBMC.0.2.0",
+        "MessageId": "UBBPowerStatusCritical",
+        "UniqueString": "",
+        "Severity": "Critical",
+        "DrainReasonPrefix": "Reboot needed",
+        "Enable": true
+    },
+    {
+        "Category": "Power Status",
+        "SubCategory": "OAM Power Status",
+        "MessageRegistry": "OpenBMC.0.2.0",
+        "MessageId": "OAMPowerStatusCritical",
+        "UniqueString": "",
+        "Severity": "Critical",
+        "DrainReasonPrefix": "Reboot needed",
+        "Enable": true
+    },
+    {
+        "Category": "Power Status",
+        "SubCategory": "PowerSequence Events",
+        "MessageRegistry": "OpenBMC.0.2.0",
+        "MessageId": "PowerSequenceUnexpected",
+        "UniqueString": "",
+        "Severity": "Warning",
+        "DrainReasonPrefix": "Reboot needed",
+        "Enable": true
+    },
+    {
+        "Category": "CPER Log Handling Events",
+        "SubCategory": "CPER Full",
+        "MessageRegistry": "ResourceEvent.1.2.1",
+        "MessageId": "ResourceErrorThresholdExceeded",
+        "UniqueString": "",
+        "Severity": "Critical",
+        "DrainReasonPrefix": "Reboot needed",
+        "Enable": true
+    },
+    {
+        "Category": "CPER Log Handling Events",
+        "SubCategory": "CPER Reach Threshold (HAS AdditionalDataURI, pointing to CPER LOG file)",
+        "MessageRegistry": "ResourceEvent.1.2.1",
+        "MessageId": "ResourceWarningThresholdExceeded",
+        "UniqueString": "",
+        "Severity": "Warning",
+        "DrainReasonPrefix": "Reboot needed",
+        "Enable": true
+    },
+    {
+        "Category": "LogRotate utility",
+        "SubCategory": "",
+        "MessageRegistry": "",
+        "MessageId": "LogAlmostFull",
+        "UniqueString": "",
+        "Severity": "Warning",
+        "DrainReasonPrefix": "Reboot needed",
+        "Enable": true
+    },
+    {
+        "Category": "LogRotate utility",
+        "SubCategory": "",
+        "MessageRegistry": "",
+        "MessageId": "LogFull",
+        "UniqueString": "",
+        "Severity": "Critical",
+        "DrainReasonPrefix": "Reboot needed",
+        "Enable": true
+    },
+    {
+        "Category": "Task Notifications",
+        "SubCategory": "Aborted",
+        "MessageRegistry": "TaskEvent.1.0.1",
+        "MessageId": "TaskAborted",
+        "UniqueString": "",
+        "Severity": "Warning",
+        "DrainReasonPrefix": "Reboot needed",
+        "Enable": true
+    },
+    {
+        "Category": "I2C/SPI Comm Errors",
+        "SubCategory": "TSI and RMI failures",
+        "MessageRegistry": "ResourceEvent.1.2.1",
+        "MessageId": "ResourceErrorsDetectedOEM",
+        "UniqueString": "TSI and RMI",
+        "Severity": "Critical",
+        "DrainReasonPrefix": "Reboot needed",
+        "Enable": true
+    }
+]
