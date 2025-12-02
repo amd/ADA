@@ -9,6 +9,7 @@ require (
 	github.com/nod-ai/ADA/redfish-exporter v0.0.0-20241002210630-2ef2d1070d90
 	github.com/prometheus/client_golang v1.20.4
 	github.com/stmcginnis/gofish v0.19.0
+	gopkg.in/yaml.v3 v3.0.1
 )
 
 require (
