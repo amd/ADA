@@ -31,15 +31,18 @@ const (
 	PeriodicRetryTime = 30
 )
 
+var monitoringEnableDisableEventChan chan RedfishSubscriptionData
+
 type RedfishServer struct {
-	IP        string `json:"ip"`
-	Username  string `json:"username"`
-	Password  string `json:"password"`
-	LoginType string `json:"loginType"`
-	SlurmNode string `json:"slurmNode"`
+	IP                 string `json:"ip"`
+	Username           string `json:"username"`
+	Password           string `json:"password"`
+	LoginType          string `json:"loginType"`
+	SlurmNode          string `json:"slurmNode"`
+	MonitoringDisabled bool   `json:"monitoringDisabled"`
 }
 
-type RedfishServersCommongConfig struct {
+type RedfishServersCommonConfig struct {
 	HostSuffix string `json:"hostSuffix"`
 	UserName   string `json:"username"`
 	Password   string `json:"password"`
@@ -57,13 +60,14 @@ type SubscriptionPayload struct {
 	Context             string                           `json:"Context,omitempty"`
 }
 
-type RedfishSubsciptionFailedData struct {
-	server  RedfishServer
-	payload SubscriptionPayload
+type RedfishSubscriptionData struct {
+	monitoringEnabled bool
+	server            *RedfishServer
+	payload           SubscriptionPayload
 }
 
 // Create a new connection to a redfish server
-func getRedfishClient(server RedfishServer, tlsTimeout string) (*gofish.APIClient, error) {
+func getRedfishClient(server *RedfishServer, tlsTimeout string) (*gofish.APIClient, error) {
 	timeOut := 0
 	if tlsTimeout != "" {
 		t, err := strconv.Atoi(tlsTimeout)
@@ -91,7 +95,7 @@ func getRedfishClient(server RedfishServer, tlsTimeout string) (*gofish.APIClien
 }
 
 // Create a subscription
-func createSubscription(c *gofish.APIClient, server RedfishServer, subscriptionPayload SubscriptionPayload) (string, error) {
+func createSubscription(c *gofish.APIClient, server *RedfishServer, subscriptionPayload SubscriptionPayload) (string, error) {
 	// Get the event service
 	eventService, err := c.Service.EventService()
 	if err != nil {
@@ -153,61 +157,119 @@ func createLegacySubscription(eventService *redfish.EventService, SubscriptionPa
 	return subscriptionURI, nil
 }
 
+// ProcessMonitoringEnableDisableEvent ...
+func ProcessMonitoringEnableDisableEvent(monitoringEnabled bool, server *RedfishServer, subscriptionPayload SubscriptionPayload) {
+	monitoringEnableDisableEventChan <- RedfishSubscriptionData{monitoringEnabled: monitoringEnabled, server: server, payload: subscriptionPayload}
+}
+
 // Create subscriptions for all servers and return their URIs
 // Rollback if any subscription attempt fails
-func CreateSubscriptionsForAllServers(redfishServers []RedfishServer, subscriptionPayload SubscriptionPayload, subscriptionMap map[string]string, mu *sync.Mutex, tlsTimeout string) error {
-	failedSubsChan := make(chan RedfishSubsciptionFailedData)
-	for _, server := range redfishServers {
-		go doSubscription(server, subscriptionPayload, subscriptionMap, mu, failedSubsChan, tlsTimeout)
-	}
+func CreateSubscriptionsForAllServers(redfishServers map[string]*RedfishServer, subscriptionPayload SubscriptionPayload, subscriptionMap map[string]string, subscriptionMu *sync.Mutex, configMu *sync.RWMutex, tlsTimeout string) error {
+	failedSubsChan := make(chan RedfishSubscriptionData)
+	monitoringEnableDisableEventChan = make(chan RedfishSubscriptionData)
 
-	go periodicSubscriptionRetry(failedSubsChan, subscriptionMap, mu, tlsTimeout)
+	go periodicSubscriptionRetry(failedSubsChan, subscriptionMap, subscriptionMu, configMu, tlsTimeout)
+
+	for _, server := range redfishServers {
+		if server.MonitoringDisabled {
+			log.Printf("server %s: monitoring disabled", server.IP)
+		} else {
+			go doSubscription(server, subscriptionPayload, subscriptionMap, subscriptionMu, configMu, failedSubsChan, tlsTimeout)
+		}
+	}
 	return nil
 }
 
-func periodicSubscriptionRetry(failedSubsChan chan RedfishSubsciptionFailedData, subscriptionMap map[string]string, mu *sync.Mutex, tlsTimeout string) {
-	failedSubsMap := map[string]RedfishSubsciptionFailedData{}
-
+func periodicSubscriptionRetry(failedSubsChan chan RedfishSubscriptionData, subscriptionMap map[string]string, subscriptionMu *sync.Mutex, configMu *sync.RWMutex, tlsTimeout string) {
+	failedSubsMap := map[string]RedfishSubscriptionData{}
 	ticker := time.NewTicker(PeriodicRetryTime * time.Second)
 	defer ticker.Stop()
 
 	for {
 		select {
 		case <-ticker.C:
+			configMu.RLock()
 			for ip, data := range failedSubsMap {
 				log.Printf("Retrying subscription for: %v", ip)
-				go doSubscription(data.server, data.payload, subscriptionMap, mu, failedSubsChan, tlsTimeout)
 				delete(failedSubsMap, ip)
+				go doSubscription(data.server, data.payload, subscriptionMap, subscriptionMu, configMu, failedSubsChan, tlsTimeout)
 			}
+			configMu.RUnlock()
 		case data := <-failedSubsChan:
-			failedSubsMap[data.server.IP] = data
+			configMu.RLock()
+			if !data.server.MonitoringDisabled {
+				// failedSubsMap would only contain monitor enabled entries
+				failedSubsMap[data.server.IP] = data
+			} else {
+				delete(failedSubsMap, data.server.IP)
+			}
+			configMu.RUnlock()
+		case data := <-monitoringEnableDisableEventChan:
+			configMu.Lock()
+			server := data.server
+			server.MonitoringDisabled = !data.monitoringEnabled
+			configMu.Unlock()
+
+			subscriptionMu.Lock()
+			if server.MonitoringDisabled {
+				if uri, ok := subscriptionMap[server.IP]; ok {
+					c, err := getRedfishClient(server, "")
+					if err != nil {
+						log.Printf("Failed to connect to server %s: %v", server.IP, err)
+						return
+					}
+					defer c.Logout()
+
+					if err := deleteSubscriptionFromServer(c, server, uri); err != nil {
+						log.Printf("Failed to delete event subscription on server %s: %v", server.IP, err)
+					} else {
+						log.Printf("Successfully deleted event subscription from server %s: %s", server.IP, uri)
+					}
+				} else {
+					delete(failedSubsMap, server.IP)
+				}
+				log.Printf("server %s: monitoring disabled", server.IP)
+			} else {
+				log.Printf("server %s: monitoring enabled", server.IP)
+				go doSubscription(server, data.payload, subscriptionMap, subscriptionMu, configMu, failedSubsChan, tlsTimeout)
+			}
+			subscriptionMu.Unlock()
 		}
 	}
 }
 
-func doSubscription(server RedfishServer, subscriptionPayload SubscriptionPayload, subscriptionMap map[string]string, mu *sync.Mutex, failedSubsChan chan RedfishSubsciptionFailedData, tlsTimeout string) {
+func doSubscription(server *RedfishServer, subscriptionPayload SubscriptionPayload, subscriptionMap map[string]string, subscriptionMu *sync.Mutex, configMu *sync.RWMutex, failedSubsChan chan RedfishSubscriptionData, tlsTimeout string) {
+	configMu.RLock()
+	// When the go routine was spawned, but before it starts we disabled it
+	if server.MonitoringDisabled {
+		configMu.RUnlock()
+		return
+	}
 	c, err := getRedfishClient(server, tlsTimeout)
 	if err != nil {
+		configMu.RUnlock()
 		log.Printf("[error] failed to connect to server %s: %v", server.IP, err)
-		failedSubsChan <- RedfishSubsciptionFailedData{server: server, payload: subscriptionPayload}
+		failedSubsChan <- RedfishSubscriptionData{monitoringEnabled: !server.MonitoringDisabled, server: server, payload: subscriptionPayload}
 		return
 	}
 	defer c.Logout()
 
 	subscriptionURI, err := createSubscription(c, server, subscriptionPayload)
 	if err != nil {
+		configMu.RUnlock()
 		log.Printf("[error] subscription failed on server %s: %v", server.IP, err)
-		failedSubsChan <- RedfishSubsciptionFailedData{server: server, payload: subscriptionPayload}
+		failedSubsChan <- RedfishSubscriptionData{monitoringEnabled: !server.MonitoringDisabled, server: server, payload: subscriptionPayload}
 		return
 	}
-	mu.Lock()
+	configMu.RUnlock()
+	subscriptionMu.Lock()
 	subscriptionMap[server.IP] = subscriptionURI
-	mu.Unlock()
+	subscriptionMu.Unlock()
 	log.Printf("Successfully created subscription on Redfish server %s: %s", server.IP, subscriptionURI)
 }
 
 // Delete all event subscriptions stored in the map
-func DeleteSubscriptionsFromAllServers(redfishServers []RedfishServer, subscriptionMap map[string]string) {
+func DeleteSubscriptionsFromAllServers(redfishServers map[string]*RedfishServer, subscriptionMap map[string]string) {
 	var wg sync.WaitGroup
 
 	log.Println("Unsubscribing from servers...")
@@ -237,7 +299,7 @@ func DeleteSubscriptionsFromAllServers(redfishServers []RedfishServer, subscript
 }
 
 // Delete a subscription from a redfish server
-func deleteSubscriptionFromServer(c *gofish.APIClient, server RedfishServer, subscriptionURI string) error {
+func deleteSubscriptionFromServer(c *gofish.APIClient, server *RedfishServer, subscriptionURI string) error {
 	// Get the event service
 	eventService, err := c.Service.EventService()
 	if err != nil {
@@ -253,7 +315,7 @@ func deleteSubscriptionFromServer(c *gofish.APIClient, server RedfishServer, sub
 }
 
 // Unsubscribes/deletes conflicting subscriptions from the server
-func deleteConflictingSubscriptions(c *gofish.APIClient, server RedfishServer, subscriptionPayload SubscriptionPayload) error {
+func deleteConflictingSubscriptions(c *gofish.APIClient, server *RedfishServer, subscriptionPayload SubscriptionPayload) error {
 	subscriptions, err := getServerSubscriptions(c, server)
 	if err != nil {
 		return err
@@ -271,7 +333,7 @@ func deleteConflictingSubscriptions(c *gofish.APIClient, server RedfishServer, s
 }
 
 // Gets all subscriptions currently active on the given server
-func getServerSubscriptions(c *gofish.APIClient, server RedfishServer) ([]*redfish.EventDestination, error) {
+func getServerSubscriptions(c *gofish.APIClient, server *RedfishServer) ([]*redfish.EventDestination, error) {
 	// Get the event service
 	eventService, err := c.Service.EventService()
 	if err != nil {
@@ -286,21 +348,21 @@ func getServerSubscriptions(c *gofish.APIClient, server RedfishServer) ([]*redfi
 }
 
 // Retrieve the server's credentials from the config based on IP
-func getServerInfo(redfishServers []RedfishServer, serverIP string) RedfishServer {
+func getServerInfo(redfishServers map[string]*RedfishServer, serverIP string) *RedfishServer {
 	for _, redfishServer := range redfishServers {
 		if redfishServer.IP == serverIP {
 			return redfishServer
 		}
 	}
-	return RedfishServer{}
+	return &RedfishServer{}
 }
 
-func getServerInfoByIP(redfishServers []RedfishServer, IP string) RedfishServer {
+func getServerInfoByIP(redfishServers map[string]*RedfishServer, IP string) *RedfishServer {
 	for _, redfishServer := range redfishServers {
 		ip := redfishServer.IP
 		if IP == extractHost(ip) {
 			return redfishServer
 		}
 	}
-	return RedfishServer{}
+	return &RedfishServer{}
 }
