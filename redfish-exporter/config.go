@@ -25,20 +25,25 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"sync"
 
 	"github.com/joho/godotenv"
 	"gopkg.in/yaml.v3"
 )
 
 const (
-	DefaultListenerPort   = "8080"
-	DefaultMetricsPort    = "2112"
-	DefaultUseSSL         = "false"
-	DefaultSeverityConfig = "Fatal,Critical,Informational"
-	NodeDrainPolicyFile   = "nodeDrainPolicy.json"
+	Localhost                     = "127.0.0.1"
+	DefaultRESTPort               = "9000"
+	DefaultListenerPort           = "8080"
+	DefaultMetricsPort            = "2112"
+	DefaultUseSSL                 = "false"
+	DefaultSeverityConfig         = "Fatal,Critical,Informational"
+	NodeDrainPolicyFile           = "nodeDrainPolicy.json"
+	MonitoringDisabledServersFile = "monitoringDisabledServers.json"
 )
 
 type Config struct {
+	sync.RWMutex
 	Information struct {
 		Updated     string
 		Description string
@@ -48,6 +53,7 @@ type Config struct {
 		ListenerPort string
 		UseSSL       bool
 		MetricsPort  int
+		RestURL      string
 	}
 	CertificateDetails struct {
 		CertFile string
@@ -59,7 +65,7 @@ type Config struct {
 	SlurmScontrolPath    string
 	SlurmDrainExcludeStr string
 	SubscriptionPayload  SubscriptionPayload
-	RedfishServers       []RedfishServer
+	RedfishServers       map[string]*RedfishServer         // map[redfishServerIP]*RedfishServer
 	TriggerEvents        map[string]map[string][]EventInfo //map[Severity][MessageRegistry.MessageId][]EventInfo
 	PrometheusConfig     PrometheusConfig
 	context              *tls.Config
@@ -102,6 +108,35 @@ type target struct {
 	Labels  map[string]string `yaml:"labels"`
 }
 
+func writeMonitoringDisabledServersToFile(servers []string) {
+	file, err := os.Create(MonitoringDisabledServersFile)
+	if err != nil {
+		log.Fatalf("Failed to create file %v, err: %v", MonitoringDisabledServersFile, err)
+	}
+	defer file.Close()
+
+	encoder := json.NewEncoder(file)
+	if err := encoder.Encode(servers); err != nil {
+		log.Fatalf("Failed to write monitoring-disabled servers list to %v, err: %v", MonitoringDisabledServersFile, err)
+	}
+}
+
+func readMonitoringDisabledServersFromFile() []string {
+	servers := []string{}
+	if _, err := os.Stat(MonitoringDisabledServersFile); err == nil {
+		file, err := os.Open(MonitoringDisabledServersFile)
+		if err != nil {
+			log.Fatalf("Failed to open file %v, err: %v", MonitoringDisabledServersFile, err)
+		}
+		defer file.Close()
+
+		if err := json.NewDecoder(file).Decode(&servers); err != nil {
+			log.Fatalf("Failed to read monitoring-disabled servers list from %v, err: %v", MonitoringDisabledServersFile, err)
+		}
+	}
+	return servers
+}
+
 func setupConfig(targetFile string) Config {
 	// Load .env file
 	err := godotenv.Load()
@@ -123,6 +158,13 @@ func setupConfig(targetFile string) Config {
 		listenerPort = DefaultListenerPort
 	}
 	AppConfig.SystemInformation.ListenerPort = listenerPort
+
+	// Read and parse REST Port with a default value
+	restPort := os.Getenv("REST_PORT")
+	if restPort == "" {
+		restPort = DefaultRESTPort
+	}
+	AppConfig.SystemInformation.RestURL = Localhost + ":" + restPort
 
 	// Metrics Port Configuration
 	metricsPortStr := os.Getenv("METRICS_PORT")
@@ -171,14 +213,23 @@ func setupConfig(targetFile string) Config {
 		AppConfig.PrometheusConfig.Severity = strings.Split(DefaultSeverityConfig, ",")
 	}
 
+	AppConfig.RedfishServers = make(map[string]*RedfishServer)
+
 	// Read and parse the REDFISH_SERVERS environment variable
 	redfishServersJSON := os.Getenv("REDFISH_SERVERS")
 	if redfishServersJSON == "" {
 		log.Println("REDFISH_SERVERS environment variable is not set or is empty")
 	} else {
-		if err := json.Unmarshal([]byte(redfishServersJSON), &AppConfig.RedfishServers); err != nil {
+		servers := []RedfishServer{}
+		if err := json.Unmarshal([]byte(redfishServersJSON), &servers); err != nil {
 			log.Fatalf("Failed to parse REDFISH_SERVERS: %v", err)
 		}
+
+		AppConfig.Lock()
+		for _, server := range servers {
+			AppConfig.RedfishServers[extractHost(server.IP)] = &server
+		}
+		AppConfig.Unlock()
 	}
 
 	// Read the node drain policy config file
@@ -237,7 +288,7 @@ func setupConfig(targetFile string) Config {
 		log.Println("redfishServersCommonConfigJSON environment variable is not set or is empty")
 		return AppConfig
 	}
-	redfishServersCommonConfig := RedfishServersCommongConfig{}
+	redfishServersCommonConfig := RedfishServersCommonConfig{}
 	if err := json.Unmarshal([]byte(redfishServersCommonConfigJSON), &redfishServersCommonConfig); err != nil {
 		log.Fatalf("Failed to parse REDFISH_SERVERS_COMMON_CONFIG: %v", err)
 	}
@@ -266,7 +317,7 @@ func setupConfig(targetFile string) Config {
 
 		for _, hostName := range t.Targets {
 			// add this target to Redfish servers
-			server := RedfishServer{}
+			server := &RedfishServer{}
 			bmcHost := fmt.Sprintf(hostName+".%v", redfishServersCommonConfig.HostSuffix)
 			ips, err := net.LookupIP(bmcHost)
 			if err != nil || len(ips) == 0 {
@@ -280,7 +331,8 @@ func setupConfig(targetFile string) Config {
 			server.Username = redfishServersCommonConfig.UserName
 			server.Password = redfishServersCommonConfig.Password
 			server.SlurmNode = hostName
-			AppConfig.RedfishServers = append(AppConfig.RedfishServers, server)
+
+			AppConfig.RedfishServers[extractHost(server.IP)] = server
 		}
 	}
 

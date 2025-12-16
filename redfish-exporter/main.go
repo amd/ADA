@@ -18,7 +18,9 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"flag"
+	"fmt"
 	"log"
 	"net"
 	"net/http"
@@ -30,6 +32,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/gorilla/mux"
 	"github.com/nod-ai/ADA/redfish-exporter/metrics"
 	"github.com/nod-ai/ADA/redfish-exporter/slurm"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
@@ -50,6 +53,16 @@ func main() {
 	// Setup configuration
 	AppConfig := setupConfig(targetFile)
 
+	// Read monitoring-disabled servers list from file and store them in config
+	// These won't be subscribed to until monitoring is enabled for them
+	serversIP := readMonitoringDisabledServersFromFile()
+
+	for _, ip := range serversIP {
+		if _, ok := AppConfig.RedfishServers[ip]; ok {
+			AppConfig.RedfishServers[ip].MonitoringDisabled = true
+		}
+	}
+
 	// Log the initialized config
 	log.Printf("Initialized Config: %+v", AppConfig)
 
@@ -59,14 +72,6 @@ func main() {
 
 	slurmQueue = slurm.InitSlurmQueue(ctx)
 	go slurmQueue.ProcessEventActionQueue()
-
-	subscriptionMap := make(map[string]string)
-
-	// Subscribe the listener to the event stream for all servers
-	err := CreateSubscriptionsForAllServers(AppConfig.RedfishServers, AppConfig.SubscriptionPayload, subscriptionMap, &subscriptionMapLock, AppConfig.TlsTimeOut)
-	if err != nil {
-		log.Fatal(err)
-	}
 
 	// Set up signal handling
 	sigChan := make(chan os.Signal, 1)
@@ -93,6 +98,16 @@ func main() {
 	// Initialize Prometheus metrics with default values
 	initMetrics(AppConfig.RedfishServers, AppConfig.PrometheusConfig.Severity)
 
+	subscriptionMap := make(map[string]string)
+
+	// Subscribe the listener to the event stream for all servers
+	err := CreateSubscriptionsForAllServers(AppConfig.RedfishServers, AppConfig.SubscriptionPayload, subscriptionMap, &subscriptionMapLock, &AppConfig.RWMutex, AppConfig.TlsTimeOut)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	AppConfig.runHttpRequestsHandlerServer()
+
 	// Wait for shutdown signal
 	<-sigChan
 	log.Println("Received shutdown signal. Closing listener...")
@@ -116,7 +131,7 @@ func main() {
 	log.Println("Shutdown complete")
 }
 
-func initMetrics(redfishServers []RedfishServer, severities []string) {
+func initMetrics(redfishServers map[string]*RedfishServer, severities []string) {
 	for _, server := range redfishServers {
 		host := extractHost(server.IP)
 
@@ -138,4 +153,76 @@ func extractHost(url string) string {
 		host = splitHost
 	}
 	return host
+}
+
+func (c *Config) runHttpRequestsHandlerServer() error {
+	// start a http server
+	router := mux.NewRouter()
+
+	// API handler for fetching all the nodes where monitoring is enabled
+	router.Methods(http.MethodGet).Subrouter().Handle("/api/nodes", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		c.RLock()
+		servers := []string{}
+		for ip, server := range c.RedfishServers {
+			if !server.MonitoringDisabled {
+				servers = append(servers, ip)
+			}
+		}
+		c.RUnlock()
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		json.NewEncoder(w).Encode(servers)
+	}))
+
+	// API handler to enable/disable monitoring on a node
+	router.Methods(http.MethodPatch).Subrouter().Handle("/api/nodes/{serverIP}", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		vars := mux.Vars(r)
+		serverIP, ok := vars["serverIP"]
+		if !ok {
+			http.Error(w, fmt.Sprintf("Server IP not specified"), http.StatusInternalServerError)
+			return
+		}
+
+		var payload struct {
+			MonitoringEnabled bool `json:"monitoring-enabled"`
+		}
+
+		if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+			http.Error(w, "invalid JSON", http.StatusBadRequest)
+			return
+		}
+
+		c.RLock()
+		defer c.RUnlock()
+
+		if _, ok := c.RedfishServers[serverIP]; ok {
+			if c.RedfishServers[serverIP].MonitoringDisabled != !payload.MonitoringEnabled {
+				// For application restarts, persist the monitoring-disabled servers list
+				servers := []string{}
+				for ip, server := range c.RedfishServers {
+					if server.MonitoringDisabled && server.IP != serverIP {
+						servers = append(servers, ip)
+					}
+				}
+
+				respString := fmt.Sprintf("node %s enabled for monitoring\n", serverIP)
+				if !payload.MonitoringEnabled {
+					respString = fmt.Sprintf("node %s disabled for monitoring\n", serverIP)
+					servers = append(servers, serverIP)
+				}
+
+				writeMonitoringDisabledServersToFile(servers)
+				go ProcessMonitoringEnableDisableEvent(payload.MonitoringEnabled, c.RedfishServers[serverIP], c.SubscriptionPayload)
+
+				w.Write([]byte(respString))
+				return
+			}
+		}
+		w.WriteHeader(http.StatusOK)
+	}))
+
+	// start the server
+	go http.ListenAndServe(c.SystemInformation.RestURL, router)
+
+	return nil
 }
