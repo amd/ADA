@@ -23,6 +23,7 @@ import (
 	"log"
 	"net"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"sync"
@@ -32,15 +33,17 @@ import (
 )
 
 const (
-	Localhost                     = "127.0.0.1"
-	DefaultRESTPort               = "9000"
-	DefaultListenerPort           = "8080"
-	DefaultMetricsPort            = "2112"
-	DefaultUseSSL                 = "false"
-	DefaultSeverityConfig         = "Fatal,Critical,Informational"
-	NodeDrainPolicyFile           = "nodeDrainPolicy.json"
-	MonitoringDisabledServersFile = "monitoringDisabledServers.json"
+	Localhost                            = "127.0.0.1"
+	DefaultRESTPort                      = "9000"
+	DefaultListenerPort                  = "8080"
+	DefaultMetricsPort                   = "2112"
+	DefaultUseSSL                        = "false"
+	DefaultSeverityConfig                = "Fatal,Critical,Informational"
+	NodeDrainPolicyFile                  = "nodeDrainPolicy.json"
+	DefaultMonitoringDisabledServersFile = "monitoringDisabledServers.json"
 )
+
+var MonitoringDisabledServersFile string
 
 type Config struct {
 	sync.RWMutex
@@ -109,6 +112,11 @@ type target struct {
 }
 
 func writeMonitoringDisabledServersToFile(servers []string) {
+	err := os.MkdirAll(filepath.Dir(MonitoringDisabledServersFile), 0755)
+	if err != nil {
+		log.Fatalf("Failed to create file path %v, err: %v", MonitoringDisabledServersFile, err)
+	}
+
 	file, err := os.Create(MonitoringDisabledServersFile)
 	if err != nil {
 		log.Fatalf("Failed to create file %v, err: %v", MonitoringDisabledServersFile, err)
@@ -158,6 +166,13 @@ func setupConfig(targetFile string) Config {
 		listenerPort = DefaultListenerPort
 	}
 	AppConfig.SystemInformation.ListenerPort = listenerPort
+
+	// Read and parse MonitoringDisabledNodesFile with a default value
+	disabledServersFile := os.Getenv("MONITORING_DISABLED_SERVERS_FILE")
+	if disabledServersFile == "" {
+		disabledServersFile = DefaultMonitoringDisabledServersFile
+	}
+	MonitoringDisabledServersFile = disabledServersFile
 
 	// Read and parse REST Port with a default value
 	restPort := os.Getenv("REST_PORT")

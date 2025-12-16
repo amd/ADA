@@ -69,18 +69,19 @@ func (q *SlurmQueue) ProcessEventActionQueue() {
 		case actionReq := <-q.queue:
 			log.Printf("Processing events action req from slurm queue: %v", actionReq)
 			if err := q.performEventAction(actionReq); err != nil {
-				metrics.SlurmAPIFailureMetric.WithLabelValues(
+				metrics.SLURMAPIDrainCallsMetric.WithLabelValues(
 					actionReq.redfishServerIP,
 					actionReq.slurmNodeName,
 					actionReq.severity,
-					"Drain").Inc()
+					actionReq.drainReason, "Failure").Inc()
 			} else {
-				metrics.SlurmAPISuccessMetric.
+				metrics.SLURMAPIDrainCallsMetric.
 					WithLabelValues(
 						actionReq.redfishServerIP,
 						actionReq.slurmNodeName,
 						actionReq.severity,
-						"Drain").Inc()
+						actionReq.drainReason, "Success").Inc()
+				metrics.RedfishExporterStatus.WithLabelValues("DrainedNodes").Inc()
 			}
 		}
 	}
@@ -106,6 +107,6 @@ func (q *SlurmQueue) performEventAction(req *eventsActionReq) error {
 		return err
 	}
 
-	log.Printf("Performed action: %v on slurm node: %v successfully", req.action, req.slurmNodeName)
+	log.Printf("Performed drain action on slurm node: %v successfully", req.slurmNodeName)
 	return nil
 }

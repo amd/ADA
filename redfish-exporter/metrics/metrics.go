@@ -20,12 +20,12 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 )
 
-var EventCountMetric = prometheus.NewCounterVec(
+var EventReceivedCountMetric = prometheus.NewCounterVec(
 	prometheus.CounterOpts{
-		Name: "RedFishEvents_received",
-		Help: "Total number of events processed",
+		Name: "redfish_events_received_total",
+		Help: "Total number of Redfish events received",
 	},
-	[]string{"SourceIP", "Severity"}, // Define the labels you want to use
+	[]string{"ip", "slurm_node_name", "event_severity", "message_id"},
 )
 
 var EventProcessingTimeMetric = prometheus.NewGaugeVec(
@@ -36,27 +36,30 @@ var EventProcessingTimeMetric = prometheus.NewGaugeVec(
 	[]string{"SourceIP", "Severity"}, // Define the labels you want to use
 )
 
-var SlurmAPIFailureMetric = prometheus.NewCounterVec(
-	prometheus.CounterOpts{
-		Name: "SlurmAPI_failure",
-		Help: "Total number of Slurm API calls that failed",
+// Number of nodes by monitoring status
+var RedfishExporterStatus = prometheus.NewGaugeVec(
+	prometheus.GaugeOpts{
+		Name: "redfish_exporter_monitoring_status",
+		Help: "Node monitoring status by type: TotalNodes, MonitoredNodes, MonitorFailures, DrainedNodes",
 	},
-	[]string{"SourceIP", "SlurmNodeName", "EventSeverity", "EventAction"}, // Define the labels you want to use
+	[]string{"type"},
 )
 
-var SlurmAPISuccessMetric = prometheus.NewCounterVec(
+// Total Drain API Per EventSeverity Per Node Per DrainReason Per APIStatus(Success/Failure)
+var SLURMAPIDrainCallsMetric = prometheus.NewCounterVec(
 	prometheus.CounterOpts{
-		Name: "SlurmAPI_success",
-		Help: "Total number of Slurm API calls that succeeded",
+		Name: "slurm_drain_api_calls_total",
+		Help: "Total number of SLURM Drain API calls",
 	},
-	[]string{"SourceIP", "SlurmNodeName", "EventSeverity", "EventAction"}, // Define the labels you want to use
+	[]string{"ip", "slurm_node_name", "event_severity", "drain_reason", "api_status"}, // Define the labels you want to use
 )
 
 func init() {
 	// Register the counter with Prometheus's default registry
-	prometheus.MustRegister(EventCountMetric)
+	prometheus.MustRegister(EventReceivedCountMetric)
+	prometheus.MustRegister(SLURMAPIDrainCallsMetric)
+
 	// Register the gauge with Prometheus's default registry
 	prometheus.MustRegister(EventProcessingTimeMetric)
-	prometheus.MustRegister(SlurmAPIFailureMetric)
-	prometheus.MustRegister(SlurmAPISuccessMetric)
+	prometheus.MustRegister(RedfishExporterStatus)
 }

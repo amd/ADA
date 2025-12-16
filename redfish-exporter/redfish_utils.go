@@ -23,6 +23,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/nod-ai/ADA/redfish-exporter/metrics"
 	"github.com/stmcginnis/gofish"
 	"github.com/stmcginnis/gofish/redfish"
 )
@@ -170,13 +171,16 @@ func CreateSubscriptionsForAllServers(redfishServers map[string]*RedfishServer, 
 
 	go periodicSubscriptionRetry(failedSubsChan, subscriptionMap, subscriptionMu, configMu, tlsTimeout)
 
+	totalNodesMonitored := 0
 	for _, server := range redfishServers {
 		if server.MonitoringDisabled {
 			log.Printf("server %s: monitoring disabled", server.IP)
 		} else {
+			totalNodesMonitored++
 			go doSubscription(server, subscriptionPayload, subscriptionMap, subscriptionMu, configMu, failedSubsChan, tlsTimeout)
 		}
 	}
+	metrics.RedfishExporterStatus.WithLabelValues("TotalNodes").Set(float64(totalNodesMonitored))
 	return nil
 }
 
@@ -188,7 +192,12 @@ func periodicSubscriptionRetry(failedSubsChan chan RedfishSubscriptionData, subs
 	for {
 		select {
 		case <-ticker.C:
+			subscriptionMu.Lock()
+			metrics.RedfishExporterStatus.WithLabelValues("MonitoredNodes").Set(float64(len(subscriptionMap)))
+			subscriptionMu.Unlock()
+
 			configMu.RLock()
+			metrics.RedfishExporterStatus.WithLabelValues("MonitorFailures").Set(float64(len(failedSubsMap)))
 			for ip, data := range failedSubsMap {
 				log.Printf("Retrying subscription for: %v", ip)
 				delete(failedSubsMap, ip)
@@ -224,6 +233,7 @@ func periodicSubscriptionRetry(failedSubsChan chan RedfishSubscriptionData, subs
 						log.Printf("Failed to delete event subscription on server %s: %v", server.IP, err)
 					} else {
 						log.Printf("Successfully deleted event subscription from server %s: %s", server.IP, uri)
+						delete(subscriptionMap, server.IP)
 					}
 				} else {
 					delete(failedSubsMap, server.IP)
@@ -276,7 +286,7 @@ func DeleteSubscriptionsFromAllServers(redfishServers map[string]*RedfishServer,
 
 	for serverIP, subscriptionURI := range subscriptionMap {
 		wg.Add(1)
-		go func(serverIP, subscriptionURI string) {
+		go func(serverIP, subscriptionURI string, subscriptionMap map[string]string) {
 			defer wg.Done()
 			server := getServerInfo(redfishServers, serverIP)
 
@@ -291,8 +301,9 @@ func DeleteSubscriptionsFromAllServers(redfishServers map[string]*RedfishServer,
 				log.Printf("Failed to delete event subscription on server %s: %v", server.IP, err)
 			} else {
 				log.Printf("Successfully deleted event subscription from server %s: %s", server.IP, subscriptionURI)
+				delete(subscriptionMap, server.IP)
 			}
-		}(serverIP, subscriptionURI)
+		}(serverIP, subscriptionURI, subscriptionMap)
 	}
 
 	wg.Wait()

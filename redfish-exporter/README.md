@@ -120,8 +120,10 @@ scontrol token username=root lifespan=18000
 
 The exporter provides the following metrics:
 
-- `RedFishEvents_received`: Counter of Redfish events received
+- `redfish_exporter_monitoring_status`: Counter of Redfish events received per SLURM node per message kind per event severity
 - `RedFishEvents_processing_time`: Gauge of event processing time
+- `redfish_exporter_monitoring_status`: Gauge of node monitoring status by type: TotalNodes, MonitoredNodes, MonitorFailures, DrainedNodes
+- `slurm_drain_api_calls_total`: Counter of SLURM Drain API calls per event severity per SLURM Node per drain reason per API Status(Success/Failure)
 
 For a complete list of available metrics and their descriptions, see the [Metrics Documentation](docs/metrics.md).
 
