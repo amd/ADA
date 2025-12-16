@@ -249,18 +249,20 @@ func (s *Server) processRequest(AppConfig Config, conn net.Conn, req *http.Reque
 		log.Printf("Message Args: %v", messageArgs)
 		log.Printf("Origin Of Condition: %s", originOfCondition)
 
+		redfishServerInfo := getServerInfoByIP(AppConfig.RedfishServers, ip)
+		slurmNodeName := redfishServerInfo.SlurmNode
+
 		trigger, drainReason := isTriggerEvent(event, AppConfig)
 		if trigger == true {
 			log.Printf("Matched Trigger Event: %s | messageId: %s | message: %s", event.Severity, event.MessageId, event.Message)
 			// Sending event belongs to redfish_utils. Each server may have different slurm node associated, and redfish_servers has the info/map.
 			if s.slurmQueue != nil {
-				redfishServerInfo := getServerInfoByIP(AppConfig.RedfishServers, ip)
-				if len(strings.TrimSpace(redfishServerInfo.SlurmNode)) == 0 {
+				if len(strings.TrimSpace(slurmNodeName)) == 0 {
 					log.Println("failed to get the slurm node name, cannot perform drain action")
 					continue
 				}
 				evt := slurm.AddEventReq{
-					RedfishServerIP: redfishServerInfo.IP,
+					RedfishServerIP: ip,
 					SlurmNodeName:   redfishServerInfo.SlurmNode,
 					Severity:        event.Severity,
 					DrainReason:     drainReason,
@@ -270,6 +272,9 @@ func (s *Server) processRequest(AppConfig Config, conn net.Conn, req *http.Reque
 				s.slurmQueue.Add(evt)
 			}
 		}
+
+		// Update metrics using variables from metrics.go
+		metrics.EventReceivedCountMetric.WithLabelValues(ip, slurmNodeName, severity, messageId).Inc()
 	}
 
 	// Append data to dataBuffer and increment eventCount
@@ -277,7 +282,6 @@ func (s *Server) processRequest(AppConfig Config, conn net.Conn, req *http.Reque
 	*eventCount++
 
 	// Update metrics using variables from metrics.go
-	metrics.EventCountMetric.WithLabelValues(ip, severity).Inc()
 	metrics.EventProcessingTimeMetric.WithLabelValues(ip, severity).SetToCurrentTime()
 
 	// Send a 200 OK response

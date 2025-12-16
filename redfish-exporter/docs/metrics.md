@@ -4,13 +4,15 @@ The AMD Redfish Exporter exposes the following Prometheus-compatible metrics:
 
 ## Event Metrics
 
-### `RedFishEvents_received`
+### `redfish_events_received_total`
 
 - **Type**: Counter
 - **Description**: Total number of Redfish events received
 - **Labels**:
-  - `SourceIP`: IP address of the Redfish server that sent the event
-  - `Severity`: Severity of the Redfish event
+  - `ip`: IP address of the Redfish server that sent the event
+  - `slurm_node_name`: Node name of the SLURM node
+  - `event_severity`: Severity of the Redfish event
+  - `message_id`: Event message kind
 
 ### `RedFishEvents_processing_time`
 
@@ -20,25 +22,28 @@ The AMD Redfish Exporter exposes the following Prometheus-compatible metrics:
   - `SourceIP`: IP address of the Redfish server that sent the event
   - `Severity`: Severity of the Redfish event
 
-### `SlurmAPI_success`
+### `redfish_exporter_monitoring_status`
 
 - **Type**: Gauge
+- **Description**: Node monitoring status by type.
+  Valid Type Values:
+  - TotalNodes: Number of nodes the application is supposed to be monitoring
+  - MonitoredNodes: Number of nodes successfully being monitored
+  - MonitorFailures: Number of nodes where monitoring has failed
+  - DrainedNodes: Number of nodes that have been drained
+- **Labels**:
+  - `type`: Node Monitoring status types - TotalNodes, MonitoredNodes, MonitorFailures, DrainedNodes
+
+### `slurm_drain_api_calls_total`
+
+- **Type**: Counter
 - **Description**: Total number of Slurm API calls that succeeded
 - **Labels**:
-  - `SourceIP`: IP address of the Redfish server that sent the event
-  - `SlurmNodeName`: Node name of the SLURM node
-  - `EventSeverity`: Severity of the event
-  - `EventAction`: Action taken
-
-### `SlurmAPI_failure`
-
-- **Type**: Gauge
-- **Description**: Total number of Slurm API calls that failed
-- **Labels**:
-  - `SourceIP`: IP address of the Redfish server that sent the event
-  - `SlurmNodeName`: Node name of the SLURM node
-  - `EventSeverity`: Severity of the event
-  - `EventAction`: Action taken
+  - `ip`: IP address of the Redfish server that sent the event
+  - `slurm_node_name`: Node name of the SLURM node
+  - `event_severity`: Severity of the event
+  - `drain_reason`: SLURM Node drain reason
+  - `api_status`: SLURM Node Drain API Status. Valid values: Success, Failure
 
 
 ## Accessing Metrics

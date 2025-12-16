@@ -96,7 +96,7 @@ func main() {
 	}()
 
 	// Initialize Prometheus metrics with default values
-	initMetrics(AppConfig.RedfishServers, AppConfig.PrometheusConfig.Severity)
+	initMetrics()
 
 	subscriptionMap := make(map[string]string)
 
@@ -131,16 +131,11 @@ func main() {
 	log.Println("Shutdown complete")
 }
 
-func initMetrics(redfishServers map[string]*RedfishServer, severities []string) {
-	for _, server := range redfishServers {
-		host := extractHost(server.IP)
-
-		// Initialize counters for each severity label
-		// Additional label combinations should be defined here
-		for _, severity := range severities {
-			metrics.EventCountMetric.WithLabelValues(host, severity).Add(0)
-		}
-	}
+func initMetrics() {
+	metrics.RedfishExporterStatus.WithLabelValues("TotalNodes").Set(float64(0))
+	metrics.RedfishExporterStatus.WithLabelValues("MonitoredNodes").Set(float64(0))
+	metrics.RedfishExporterStatus.WithLabelValues("MonitorFailures").Set(float64(0))
+	metrics.RedfishExporterStatus.WithLabelValues("DrainedNodes").Set(float64(0))
 }
 
 // Helper function to extract the host from the URL
@@ -210,7 +205,8 @@ func (c *Config) runHttpRequestsHandlerServer() error {
 					respString = fmt.Sprintf("node %s disabled for monitoring\n", serverIP)
 					servers = append(servers, serverIP)
 				}
-
+				totalNodesMonitored := len(c.RedfishServers) - len(servers)
+				metrics.RedfishExporterStatus.WithLabelValues("TotalNodes").Set(float64(totalNodesMonitored))
 				writeMonitoringDisabledServersToFile(servers)
 				go ProcessMonitoringEnableDisableEvent(payload.MonitoringEnabled, c.RedfishServers[serverIP], c.SubscriptionPayload)
 
