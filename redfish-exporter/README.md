@@ -15,7 +15,6 @@ The AMD Redfish Exporter is a Go server that subscribes to events and telemetry 
 ### Prerequisites
 
 - Go 1.23 or later
-- Docker
 - SLURM (for node management functionality)
 
 ### Building from source
@@ -65,6 +64,7 @@ The AMD Redfish Exporter is configured using environment variables or a configur
 - `LISTENER_IP`: IP address to listen on (default: "127.0.0.1")
 - `LISTENER_PORT`: Port to listen on for Redfish events (default: "8080")
 - `METRICS_PORT`: Port to expose Prometheus metrics (default: "2112")
+- `REST_PORT`: Port to listen to REST API requests (default: "9000")
 - `USE_SSL`: Enable SSL/TLS (default: "false")
 - `CERTFILE`: Path to SSL certificate file (required if USE_SSL is true)
 - `KEYFILE`: Path to SSL key file (required if USE_SSL is true)
@@ -72,6 +72,7 @@ The AMD Redfish Exporter is configured using environment variables or a configur
 - `SLURM_TOKEN`: SLURM authentication token
 - `SLURM_CONTROL_NODE`: SLURM control node address
 - `REDFISH_SERVERS`: JSON array of Redfish server configurations
+- `MONITORING_DISABLED_SERVERS_FILE`: JSON file containing list of Redfish servers where monitoring is disabled (default: "monitoringDisabledServers.json)
 - `SUBSCRIPTION_PAYLOAD`: JSON object defining the Redfish subscription parameters
 
 For a complete list of configuration options, refer to the [Configuration Guide](docs/configuration.md).
@@ -94,27 +95,8 @@ Note that SSL can be enabled using the provided dev certificate and key and `--s
 
 ### Slurm Integration
 
-The exporter is designed to utilize Slurm APIs from version `0.0.39`. Please follow these instructions only if you wish to use APIs from a different version. Keep in mind that the code generator may not function properly with older versions. If you prefer to stick with the `0.0.39` APIs, you can skip steps 1 and 2.
-
-1. Follow [this](./api/README.md) guide for generating the Slurm REST API.
-
-2. Required configurations:
-
-- **SLURM_TOKEN**: Obtain the token by running the following command on the Slurm control node (where slurmrestd is running):
-
-```sh
-scontrol token username=root lifespan=18000
-```
-
-(`lifespan` is specified in seconds)
-
+The exporter is designed to utilize Slurm scontrol APIs.
 - **SLURM_CONTROL_NODE**: The hostname or IP address of the Slurm control node where the REST server is running.
-
-3. Run the AMD Redfish Exporter with `--enable-slurm` flag to enable SLURM integration:
-
-```bash
-./amd-redfish-exporter --enable-slurm
-```
 
 ## Metrics
 

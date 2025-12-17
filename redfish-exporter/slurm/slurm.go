@@ -1,7 +1,6 @@
 package slurm
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -11,8 +10,6 @@ import (
 	"regexp"
 	"strings"
 	"time"
-
-	"github.com/nod-ai/ADA/redfish-exporter/api/generated/slurmrestdapi"
 )
 
 var (
@@ -52,100 +49,6 @@ type SlurmServerConfig struct {
 	BearerToken string
 }
 
-type Client struct {
-	apiClient *slurmrestdapi.APIClient // slurm URL to client mapping
-}
-
-var apiCl *Client // singleton client
-
-func NewClient(slurmControlNode, slurmUser, slurmToken string) (*Client, error) {
-	slConfig := &SlurmServerConfig{
-		URL:         slurmControlNode,
-		Username:    defaultSlurmUsername,
-		BearerToken: slurmToken,
-	}
-	if slurmUser != "" {
-		slConfig.Username = slurmUser
-	}
-	cl := createRestClient(slConfig)
-	c := &Client{apiClient: cl}
-
-	log.Printf("[slurm] created slurm client for node: %v\n", slurmControlNode)
-
-	err := c.getConnectionStatus()
-	if err != nil {
-		log.Printf("[slurm] error in getting the connection status of the slurm node: %v, err: %+v\n", slurmControlNode, err)
-	}
-
-	apiCl = c
-	return c, err
-}
-
-func GetClient() *Client {
-	return apiCl
-}
-
-func (c *Client) ResumeNode(nodeName string) error {
-	apiCall := func() (interface{}, *http.Response, error) {
-		ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
-		jreq := c.apiClient.SlurmAPI.SlurmV0039UpdateNode(ctx, nodeName)
-		req := slurmrestdapi.V0039UpdateNodeMsg{State: []string{"resume"}}
-		jreq = jreq.V0039UpdateNodeMsg(req)
-		res, resp, err := c.apiClient.SlurmAPI.SlurmV0039UpdateNodeExecute(jreq)
-		cancel()
-		if err != nil {
-			return res, resp, err
-		} else if resp.StatusCode != 200 {
-			return res, resp, fmt.Errorf("invalid status code: %v", resp.StatusCode)
-		}
-		return res, resp, nil
-	}
-
-	_, resp, err := CallWithRetry(apiCall, maxRetries, baseDelay)
-	if err != nil {
-		return err
-	}
-	defer resp.Body.Close()
-
-	return nil
-}
-
-func (c *Client) DrainNodeWithAPI(nodeName, reason, excludeStr, scontrolPath string) error {
-	apiCall := func() (interface{}, *http.Response, error) {
-		uid := "0"
-		ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
-		//slurm_v0039_update_node
-		jreq := c.apiClient.SlurmAPI.SlurmV0039UpdateNode(ctx, nodeName)
-		req := slurmrestdapi.V0039UpdateNodeMsg{State: []string{"drain"}, Reason: &reason, ReasonUid: &uid}
-
-		jreq = jreq.V0039UpdateNodeMsg(req)
-		res, resp, err := c.apiClient.SlurmAPI.SlurmV0039UpdateNodeExecute(jreq)
-		cancel()
-		if err != nil {
-			return res, resp, err
-		} else if resp.StatusCode != 200 {
-			return res, resp, fmt.Errorf("invalid status code: %v", resp.StatusCode)
-		}
-		return res, resp, nil
-	}
-
-	curReason, err := c.GetNodeReasonWithAPI(nodeName)
-	if err != nil {
-		return err
-	}
-	log.Printf("node: %v, Reason: %v", nodeName, curReason)
-	if strings.Contains(curReason, excludeStr) {
-		return fmt.Errorf("%s: not draining node: %s | current reason: %s", ExlcudeReasonSet, nodeName, curReason)
-	}
-	_, resp, err := CallWithRetry(apiCall, maxRetries, baseDelay)
-	if err != nil {
-		return err
-	}
-	defer resp.Body.Close()
-
-	return nil
-}
-
 func DrainNodeWithScontrol(nodeName, reason, excludeStr, scontrolPath string) error {
 
 	if excludeStr != "" {
@@ -172,67 +75,6 @@ func DrainNodeWithScontrol(nodeName, reason, excludeStr, scontrolPath string) er
 	return nil
 }
 
-func (c *Client) GetNodesWithAPI() ([]string, error) {
-	var nodes []string
-	apiCall := func() (interface{}, *http.Response, error) {
-		ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
-		jreq := c.apiClient.SlurmAPI.SlurmV0039GetNodes(ctx)
-		res, resp, err := c.apiClient.SlurmAPI.SlurmV0039GetNodesExecute(jreq)
-		cancel()
-		if err != nil {
-			return res, resp, err
-		} else if resp.StatusCode != 200 {
-			return res, resp, fmt.Errorf("invalid status code: %v", resp.StatusCode)
-		}
-		return res, resp, nil
-	}
-
-	res, resp, err := CallWithRetry(apiCall, maxRetries, baseDelay)
-	if err != nil {
-		return nodes, err
-	}
-	defer resp.Body.Close()
-
-	log.Printf("[slurm] get nodes: %+v\n", nodes)
-	temp := res.(*slurmrestdapi.V0039NodesResponse)
-	for _, node := range temp.GetNodes() {
-		nodes = append(nodes, *node.Name)
-	}
-	return nodes, nil
-}
-
-func (c *Client) GetNodeReasonWithAPI(nodeName string) (string, error) {
-	var reason string
-	apiCall := func() (interface{}, *http.Response, error) {
-		ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
-		jreq := c.apiClient.SlurmAPI.SlurmV0039GetNode(ctx, nodeName)
-		res, resp, err := c.apiClient.SlurmAPI.SlurmV0039GetNodeExecute(jreq)
-		cancel()
-		if err != nil {
-			return res, resp, err
-		} else if resp.StatusCode != 200 {
-			return res, resp, fmt.Errorf("invalid status code: %v", resp.StatusCode)
-		}
-		return res, resp, nil
-	}
-
-	res, resp, err := CallWithRetry(apiCall, maxRetries, baseDelay)
-	if err != nil {
-		return reason, err
-	}
-	defer resp.Body.Close()
-
-	temp := res.(*slurmrestdapi.V0039NodesResponse)
-	nodes := temp.GetNodes()
-	if len(nodes) != 1 {
-		return reason, fmt.Errorf("GetNodeReason failed")
-	}
-
-	reason = *nodes[0].Reason
-	log.Printf("[slurm] get node reasons(%s): %+v\n", nodeName, reason)
-	return reason, nil
-}
-
 func GetNodeReasonWithScontrol(nodeName, scontrolPath string) (string, error) {
 	type scontrolShowNode struct {
 		Nodes []struct {
@@ -257,43 +99,6 @@ func GetNodeReasonWithScontrol(nodeName, scontrolPath string) (string, error) {
 	}
 	log.Printf("get node reasons(%s): %+v\n", nodeName, res.Nodes[0].Reason)
 	return res.Nodes[0].Reason, nil
-}
-
-func (c *Client) getConnectionStatus() error {
-	apiCall := func() (interface{}, *http.Response, error) {
-		ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
-		jreq := c.apiClient.SlurmAPI.SlurmV0039Ping(ctx)
-		res, resp, err := c.apiClient.SlurmAPI.SlurmV0039PingExecute(jreq)
-		cancel()
-		if err != nil {
-			return res, resp, err
-		} else if resp.StatusCode != 200 {
-			return res, resp, fmt.Errorf("invalid status code: %v", resp.StatusCode)
-		}
-		return res, resp, nil
-	}
-
-	_, resp, err := CallWithRetry(apiCall, maxRetries, baseDelay)
-	if err != nil {
-		return nil
-	}
-	defer resp.Body.Close()
-
-	log.Printf("[slurm] ping success: %v\n", resp.StatusCode)
-	return nil
-}
-
-func createRestClient(c *SlurmServerConfig) *slurmrestdapi.APIClient {
-	cfg := slurmrestdapi.NewConfiguration()
-	cfg.HTTPClient = &http.Client{Timeout: slurmRestClientTimeout}
-	cfg.Scheme = "http"
-	cfg.Host = c.URL
-
-	cfg.AddDefaultHeader("X-SLURM-USER-NAME", c.Username)
-	cfg.AddDefaultHeader("X-SLURM-USER-TOKEN", c.BearerToken)
-
-	client := slurmrestdapi.NewAPIClient(cfg)
-	return client
 }
 
 // LocalCommandOutput runs a command on a node and returns output in string format

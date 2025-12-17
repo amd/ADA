@@ -146,7 +146,6 @@ The integration tests cover the following scenarios:
 1. Redfish event subscription
 2. Event reception and processing
 3. Metric exposition
-4. SLURM integration (if enabled)
 
 ## Troubleshooting
 

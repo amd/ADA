@@ -5,7 +5,6 @@
 ### Prerequisites
 
 - Go 1.23 or later
-- Docker
 - SLURM (for node management functionality)
 
 ### Building from Source
@@ -53,11 +52,6 @@ Refer to the [Configuration Guide](configuration.md) for detailed information on
 ## Running the Exporter
 
 - Set up the configuration as described in the Configuration Guide.
-- Run the AMD Redfish Exporter with `--enable-slurm` flag to enable SLURM integration:
-
- ```bash
- ./amd-redfish-exporter --enable-slurm
- ```
 
 1. The exporter will start subscribing to events from the configured Redfish servers and expose metrics on the specified metrics port.
 
