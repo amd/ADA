@@ -170,13 +170,29 @@ func (c *Config) runHttpRequestsHandlerServer() error {
 	}))
 
 	// API handler to enable/disable monitoring on a node
-	router.Methods(http.MethodPatch).Subrouter().Handle("/api/nodes/{serverIP}", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	router.Methods(http.MethodPatch).Subrouter().Handle("/api/nodes/{server}", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		vars := mux.Vars(r)
-		serverIP, ok := vars["serverIP"]
+		bmcHost, ok := vars["server"]
 		if !ok {
-			http.Error(w, fmt.Sprintf("Server IP not specified"), http.StatusInternalServerError)
+			http.Error(w, fmt.Sprintf("Server IP/Name not specified"), http.StatusInternalServerError)
 			return
 		}
+
+		var (
+			ips []net.IP
+			err error
+		)
+
+		// Resolve Name/IP
+		if ip := net.ParseIP(bmcHost); ip != nil {
+			ips = []net.IP{ip}
+		} else if ips, err = net.LookupIP(bmcHost); err != nil || len(ips) == 0 {
+			http.Error(w, fmt.Sprintf("Couldn't get the IP for host: %v, err: %v", bmcHost, err), http.StatusInternalServerError)
+			return
+		}
+
+		log.Println("IPs: ", ips)
+		serverIP := fmt.Sprint(ips[0])
 
 		var payload struct {
 			MonitoringEnabled bool `json:"monitoring-enabled"`
