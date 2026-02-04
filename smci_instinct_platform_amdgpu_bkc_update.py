@@ -352,7 +352,7 @@ def checkUbb(bmc_ip, bmc_username, bmc_password, max_attempts=2):
     REDFISH_OEM = None
     REDFISH_UBB_TASKS = None
     # List of GPU models
-    gpu_models = ["MI300X", "MI300", "MI308X", "MI308", "MI325X", "MI325", "MI350X", "MI350", "MI355X", "MI355"]
+    gpu_models = ["MI300X", "MI300", "MI308X", "MI308", "MI325X", "MI325", "MI350X", "MI350", "MI355X", "MI355", "AMD", "UBB"]
 
     # Loop through each model
     for model in gpu_models:
@@ -594,7 +594,7 @@ def systemPowerCycle(bmc_ip, bmc_username, bmc_password):
     Cycle the power using the BMC.
     This implies an off-then-wait-then-on sequence.
     """
-    dwell = 240
+    dwell = 260
     INTERVAL = 3
 
     if NO_POWER_OFF == True:
@@ -617,6 +617,42 @@ def systemPowerCycle(bmc_ip, bmc_username, bmc_password):
     print(f"\rRemaining time:   0s\r", end="")
     systemPowerOn(bmc_ip, bmc_username, bmc_password)
 
+def bmcReset(bmc_ip, bmc_username, bmc_password):
+    """
+    Reset the BMC on the system.
+    """
+    dwell = 240
+    INTERVAL = 3
+
+    log("Initiating BMC reset")
+
+    bmc_reset_url = f"{PROTOCOL}://{bmc_ip}:{PORT}/{REDFISH_MANAGER_BMC}/Actions/Manager.Reset"
+
+    try:
+        response = http_request_with_retries(
+            "post", bmc_reset_url, auth=(bmc_username, bmc_password), json={"ResetType": "GracefulRestart"}
+        )
+        check_response_success(response, "BMC reset failure.")
+        task_response_text = response.text
+    except Exception as e:
+        log(f"Exception while resetting BMC: {e}")
+        sys.exit(1)
+
+    log(f"Waiting for {dwell // 60} minutes for the BMC to finish the reboot")
+    remaining_time = dwell
+
+    while remaining_time > 0:
+        print(f"\rRemaining time: {remaining_time:>3}s", end="")
+        sys.stdout.flush()
+        time.sleep(INTERVAL)
+        remaining_time -= INTERVAL
+
+    print(f"\rRemaining time:   0s\r", end="")
+    if not authenticate(bmc_ip, bmc_username, bmc_password):
+        log("Authentication failed. BMC failed to reboot in the expected time.")
+
+        sys.exit(1)
+    log(f"BMC reboot complete")
 
 def logsClear(bmc_ip, bmc_username, bmc_password):
     """
@@ -795,6 +831,9 @@ def update_bkc(bmc_ip, bmc_username, bmc_password):
 
     while not bkc_pattern.match(bkc_target_version):
         bkc_target_version = input("Enter taget BKC version (example 01.25.01.03): ")
+
+    # Reset the BMC to ensure it is ready to receive the pldm file
+    bmcReset(bmc_ip, bmc_username, bmc_password)
 
     log(f"Updating BKC with file: {bkc_pldm}")
 
