@@ -151,8 +151,8 @@ To support batch use, user input can be replaced with environment variables set 
 
 ###  Overview
 
-The script deletes logs from the Instict DCGPU assembly followed by a power cycle.  This does not
-delete the BMC logs.  Running this script is strongly suggested after updating the BKC (Instict
+The script deletes logs from the Instinct DCGPU assembly followed by a power cycle.  This does not
+delete the BMC logs.  Running this script is strongly suggested after updating the BKC (Instinct
 firmware) or replace an OAM module on the assembly.  Script can run from Windows or Linux.
 
 ### Execution on Windows
