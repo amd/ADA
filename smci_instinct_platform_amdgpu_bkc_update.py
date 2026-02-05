@@ -42,6 +42,7 @@ args = parser.parse_args()
 DEBUG = args.debug
 VERBOSE = args.verbose
 NO_POWER_OFF = args.no_power_off
+ALERT_ECC_THRESHOLD = 128
 
 # --------------------------------------------------------------------
 # Constants for porting between platforms
@@ -84,7 +85,11 @@ def check_response_success(response, error_message: str):
         log(f"HTTP status code: {response.status_code}")
         sys.exit(1)
     elif response.status_code == 400:
-        if ("MI325" in REDFISH_OEM) or ("MI350" in REDFISH_OEM) or ("MI355" in REDFISH_OEM):
+        if (
+            ("MI325" in REDFISH_OEM)
+            or ("MI350" in REDFISH_OEM)
+            or ("MI355" in REDFISH_OEM)
+        ):
             log("Workaround for H14 with MI350X or MI355X.")
             return
 
@@ -210,6 +215,145 @@ def authenticate(bmc_ip, bmc_username, bmc_password):
         return False
 
     return True
+
+
+def checkOam(bmc_ip, bmc_username, bmc_password):
+    """
+    Check the health of the OAM modules.
+    """
+    failingOam = 0
+
+    for oam in range(8):
+        url = f"{PROTOCOL}://{bmc_ip}:{PORT}/redfish/v1/Chassis/OAM_{oam}"
+
+        try:
+            response = requests.get(
+                url, auth=(bmc_username, bmc_password), verify=False, timeout=10
+            )
+            response.raise_for_status()
+            data = response.json()
+        except requests.exceptions.RequestException as e:
+            print(f"[FAIL] Failed to retrieve OAM {oam} data: {e}")
+            failingOam += 1
+            continue
+
+        if not data:
+            print("[FAIL] OAM {oam} not found.")
+            failingOam += 1
+            continue
+
+        serialNumber = data.get("SerialNumber", "Unknown")
+        sku = data.get("SKU", "Unknown")
+        partNumber = data.get("PartNumber", "Unknown")
+        status = data.get("Status", [])
+        health = status.get("Health", "Unknown")
+        # healthRollUp = status.get("HealthRollUp", "Unknown")
+
+        if health == "Critical":
+            print(
+                f"[FAIL] OAM={oam}, SerialNumber={serialNumber}, "
+                f"PartNumber={partNumber}, SKU={sku}, Health={health}, "
+                f"ALERT OAM health is critical, please pull AllLogs"
+            )
+            failingGpu += 1
+        else:
+            if DEBUG:
+                print(
+                    f"[OK]   OAM={oam}, SerialNumber={serialNumber}, "
+                    f"PartNumber={partNumber}, SKU={sku}, Health={health}"
+                )
+
+    return failingOam
+
+
+def checkMemory(bmc_ip, bmc_username, bmc_password):
+    """
+    Check the health of the HBM memory for each OAM. Modules are listed by GPU number, not OAM, this is not a one to one match.
+    """
+    failingGpu = 0
+
+    for gpu in range(8):
+        url = f"{PROTOCOL}://{bmc_ip}:{PORT}/redfish/v1/Systems/UBB/Memory/GPU{gpu}"
+
+        try:
+            response = requests.get(
+                url, auth=(bmc_username, bmc_password), verify=False, timeout=10
+            )
+            response.raise_for_status()
+            data = response.json()
+        except requests.exceptions.RequestException as e:
+            print(f"[FAIL] Failed to retrieve GPU {gpu} memory data: {e}")
+            failingGpu += 1
+            continue
+
+        if not data:
+            print("[FAIL] GPU {gpu} memory not found.")
+            if VERBOSE:
+                print(json.dumps(data, indent=4))
+            failingGpu += 1
+            continue
+
+        device = data.get("DeviceLocator") or member.get("Id") or "<unknown>"
+        health = data.get("Status", {}).get("Health", "N/A")
+
+        # This may only be for MI35x
+        url = f"{PROTOCOL}://{bmc_ip}:{PORT}/redfish/v1/Systems/UBB/Memory/GPU{gpu}/MemoryMetrics"
+
+        try:
+            response = requests.get(
+                url, auth=(bmc_username, bmc_password), verify=False, timeout=10
+            )
+            response.raise_for_status()
+            memoryMetrics = response.json()
+        except requests.exceptions.RequestException as e:
+            print(f"[FAIL] Failed to retrieve GPU {gpu} memory metrics data: {e}")
+            failingGpu += 1
+            continue
+
+        if not memoryMetrics:
+            print("[FAIL] GPU {gpu} memory metrics not found.")
+            if VERBOSE:
+                print(json.dumps(memoryMetrics, indent=4))
+            failingGpu += 1
+            continue
+
+        lifetime = memoryMetrics.get("LifeTime", {})
+        current_period = memoryMetrics.get("CurrentPeriod", {})
+        correctable = current_period.get("CorrectableECCErrorCount", "N/A")
+
+        ecc = lifetime.get("UncorrectableECCErrorCount", None)
+
+        if health == "Critical":
+            print(
+                f"[FAIL] "
+                f"Device={device}, "
+                f"UncorrectableECCErrorCount (LifeTime)={ecc}, "
+                f"CorrectableECCErrorCount (CurrentPeriod)={correctable}, "
+                f"Health={health}, "
+                f"ALERT Health is Critical, check AllLogs"
+            )
+            failingGpu += 1
+        elif (ecc is not None) and (ecc >= ALERT_ECC_THRESHOLD):
+            print(
+                f"[FAIL] "
+                f"Device={device}, "
+                f"UncorrectableECCErrorCount (LifeTime)={ecc}, "
+                f"CorrectableECCErrorCount (CurrentPeriod)={correctable}, "
+                f"Health={health}, "
+                f"ALERT Check system if page retirement threshold exceeded"
+            )
+            failingGpu += 1
+        else:
+            if DEBUG:
+                print(
+                    f"[OK]   "
+                    f"Device={device}, "
+                    f"UncorrectableECCErrorCount (LifeTime)={ecc}, "
+                    f"CorrectableECCErrorCount (CurrentPeriod)={correctable}, "
+                    f"Health={health}"
+                )
+
+    return failingGpu
 
 
 def check_power_supplies(bmc_ip, bmc_username, bmc_password):
@@ -352,7 +496,20 @@ def checkUbb(bmc_ip, bmc_username, bmc_password, max_attempts=2):
     REDFISH_OEM = None
     REDFISH_UBB_TASKS = None
     # List of GPU models
-    gpu_models = ["MI300X", "MI300", "MI308X", "MI308", "MI325X", "MI325", "MI350X", "MI350", "MI355X", "MI355", "AMD", "UBB"]
+    gpu_models = [
+        "MI300X",
+        "MI300",
+        "MI308X",
+        "MI308",
+        "MI325X",
+        "MI325",
+        "MI350X",
+        "MI350",
+        "MI355X",
+        "MI355",
+        "AMD",
+        "UBB",
+    ]
 
     # Loop through each model
     for model in gpu_models:
@@ -617,6 +774,7 @@ def systemPowerCycle(bmc_ip, bmc_username, bmc_password):
     print(f"\rRemaining time:   0s\r", end="")
     systemPowerOn(bmc_ip, bmc_username, bmc_password)
 
+
 def bmcReset(bmc_ip, bmc_username, bmc_password):
     """
     Reset the BMC on the system.
@@ -626,11 +784,16 @@ def bmcReset(bmc_ip, bmc_username, bmc_password):
 
     log("Initiating BMC reset")
 
-    bmc_reset_url = f"{PROTOCOL}://{bmc_ip}:{PORT}/{REDFISH_MANAGER_BMC}/Actions/Manager.Reset"
+    bmc_reset_url = (
+        f"{PROTOCOL}://{bmc_ip}:{PORT}/{REDFISH_MANAGER_BMC}/Actions/Manager.Reset"
+    )
 
     try:
         response = http_request_with_retries(
-            "post", bmc_reset_url, auth=(bmc_username, bmc_password), json={"ResetType": "GracefulRestart"}
+            "post",
+            bmc_reset_url,
+            auth=(bmc_username, bmc_password),
+            json={"ResetType": "GracefulRestart"},
         )
         check_response_success(response, "BMC reset failure.")
         task_response_text = response.text
@@ -653,6 +816,7 @@ def bmcReset(bmc_ip, bmc_username, bmc_password):
 
         sys.exit(1)
     log(f"BMC reboot complete")
+
 
 def logsClear(bmc_ip, bmc_username, bmc_password):
     """
