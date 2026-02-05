@@ -79,6 +79,74 @@ To support batch use, user input can be replaced with environment variables set 
 | BMC_USERNAME | Username for logging into the BMC.  |  
 | BMC_PASSWORD | Password used to log into the BMC.  |  
 
+## All Logs Collection Script smci_instinct_platform_amdgpu_health_check.py
+
+Script checks the health status metrics from the OAMs and the HBM memory for
+the OAMs.  If one or more OAMs are shown to have an issue then the AllLogs
+will automatically be captured. As part of operations the power supplies are
+checked.  If the UBB assebly cannot be reached then the script will attempt
+to power cycle the system.
+
+### Execution on Windows
+
+1.	Ensure Python is installed on the system by running python3.exe
+    - If it is not installed, then please follow on screen directions to install it.
+```
+python3.exe
+```
+2.	Ensure the requests module is installed
+```
+python3.exe -m pip install --upgrade pip
+python3.exe -m pip install requests
+```
+3.	Run the script to collect the logs
+    - User will be prompted to provide the BMC username, password, and IP address
+```
+python3.exe smci_instinct_platform_amdgpu_health_check.py
+```
+
+### Example of running on Ubuntu
+
+1.	Ensure Python with packages is installed on the system
+```
+sudo apt update && sudo apt install -y python3-full
+```
+3.	Run the script to collect the logs
+    - User will be prompted to provide the BMC username, password, and IP address
+```
+python3 smci_instinct_platform_amdgpu_health_check.py
+```
+
+### Example of running on RHEL
+
+
+1.	Ensure Python with packages is installed on the system
+```
+sudo yum update && sudo yum install -y python3-requests
+```
+3.	Run the script to collect the logs
+    - User will be prompted to provide the BMC username, password, and IP address
+```
+python3 smci_instinct_platform_amdgpu_health_check.py
+```
+
+### Parameters
+
+| Parameter      | Description                                                                          |  
+|----------------|--------------------------------------------------------------------------------------|  
+| --debug        | Adding the --debug option will provide debug information and show the BMC password.  |  
+| --no-power-off | Do not power off the system even if power cycle required                             |  
+
+### Batch use
+
+To support batch use, user input can be replaced with environment variables set in the environment.
+
+| Parameter    | Description                         |  
+|--------------|-------------------------------------|  
+| BMC_IP       | IPv4 address of the BMC.            |  
+| BMC_USERNAME | Username for logging into the BMC.  |  
+| BMC_PASSWORD | Password used to log into the BMC.  |  
+
 ## Clear Logs Script smci_instinct_platform_amdgpu_clear_all_logs.py
 
 ###  Overview
