@@ -17,7 +17,8 @@ ln -s /nfsshare/rocm-<version> /opt/rocm
 
 Script generates and pulls the AllLogs from the target system.  As part of
 operations the power supplies are checked.  If the UBB assembly cannot be
-reached then, the script will attempt to power cycle the system.
+reached then, the script will attempt to power cycle the system.  Script can
+run from Windows or Linux.
 
 ### Execution on Windows
 
@@ -82,10 +83,10 @@ To support batch use, user input can be replaced with environment variables set 
 ## OAM Health Check Script smci_instinct_platform_amdgpu_health_check.py
 
 Script checks the health status metrics from the OAMs and the HBM memory for
-the OAMs.  If one or more OAMs are shown to have an issue then the AllLogs
+the OAMs.  If one or more OAMs are shown to have an issue, then the AllLogs
 will automatically be captured. As part of operations the power supplies are
 checked.  If the UBB assembly cannot be reached, then the script will attempt
-to power cycle the system.
+to power cycle the system.  Script can run from Windows or Linux.
 
 ### Execution on Windows
 
@@ -219,7 +220,8 @@ To support batch use, user input can be replaced with environment variables set 
 
 Script updates the BKC on the DCGPU on the target system.  As part of
 operations the power supplies are checked.  If the UBB assembly cannot be
-reached, then the script will attempt to power cycle the system.
+reached, then the script will attempt to power cycle the system.  Script can
+run from Windows or Linux.
 
 ### Execution on Windows
 
