@@ -79,7 +79,7 @@ To support batch use, user input can be replaced with environment variables set 
 | BMC_USERNAME | Username for logging into the BMC.  |  
 | BMC_PASSWORD | Password used to log into the BMC.  |  
 
-## All Logs Collection Script smci_instinct_platform_amdgpu_health_check.py
+## OAM Health Check Script smci_instinct_platform_amdgpu_health_check.py
 
 Script checks the health status metrics from the OAMs and the HBM memory for
 the OAMs.  If one or more OAMs are shown to have an issue then the AllLogs
