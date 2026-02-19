@@ -1035,9 +1035,17 @@ def update_bkc(bmc_ip, bmc_username, bmc_password):
         log(f"Exception while uploading pldm file: {e}")
         sys.exit(1)
 
+    log(f"Power cycling system twice to ensure BKC update completes")
     tasks_smc_wait(bmc_ip, bmc_username, bmc_password)
     tasks_bmc_wait(bmc_ip, bmc_username, bmc_password)
 
+    log(f"Initiating first power cycle")
+    systemPowerCycle(bmc_ip, bmc_username, bmc_password)
+
+    tasks_smc_wait(bmc_ip, bmc_username, bmc_password)
+    tasks_bmc_wait(bmc_ip, bmc_username, bmc_password)
+
+    log(f"Initiating second power cycle")
     systemPowerCycle(bmc_ip, bmc_username, bmc_password)
 
     tasks_smc_wait(bmc_ip, bmc_username, bmc_password)

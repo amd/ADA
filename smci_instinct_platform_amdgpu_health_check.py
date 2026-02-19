@@ -21,7 +21,6 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
-
 # If the requests module is not installed on your system please run the following commands:
 # python3 -m pip install --upgrade pip
 # python3 -m pip install requests
@@ -1038,9 +1037,17 @@ def update_bkc(bmc_ip, bmc_username, bmc_password):
         log(f"Exception while uploading pldm file: {e}")
         sys.exit(1)
 
+    log(f"Power cycling system twice to ensure BKC update completes")
     tasks_smc_wait(bmc_ip, bmc_username, bmc_password)
     tasks_bmc_wait(bmc_ip, bmc_username, bmc_password)
 
+    log(f"Initiating first power cycle")
+    systemPowerCycle(bmc_ip, bmc_username, bmc_password)
+
+    tasks_smc_wait(bmc_ip, bmc_username, bmc_password)
+    tasks_bmc_wait(bmc_ip, bmc_username, bmc_password)
+
+    log(f"Initiating second power cycle")
     systemPowerCycle(bmc_ip, bmc_username, bmc_password)
 
     tasks_smc_wait(bmc_ip, bmc_username, bmc_password)
