@@ -216,6 +216,73 @@ To support batch use, user input can be replaced with environment variables set 
 | BMC_USERNAME | Username for logging into the BMC.  |  
 | BMC_PASSWORD | Password used to log into the BMC.  |  
 
+## Power Drain Script smci_instinct_platform_amdgpu_clear_power_drain.py
+
+###  Overview
+
+Script powers off the platfrom long enough to power drain the Instinct DCGPU assembly
+followed by a power on.  This is done to clear system errors and to complete HBM page
+retirements.  Script can run from Windows or Linux.
+
+### Execution on Windows
+
+1.	Ensure Python is installed on the system by running python3.exe
+    - If it is not installed, then please follow on screen directions to install it.
+    - If it is installed, then please type quit to exit python3.exe.
+```
+python3.exe
+```
+2.	Ensure the requests module is installed
+```
+python3.exe -m pip install --upgrade pip
+python3.exe -m pip install requests
+```
+3.	Run the script to clear the logs
+    - User will be prompted to provide the BMC username, password, and IP address.
+```
+python3.exe smci_instinct_platform_amdgpu_power_drain.py
+```
+
+### Example of running on Ubuntu
+
+1.	Ensure Python with packages is installed on the system
+```
+sudo apt update && sudo apt install -y python3-full
+```
+2.	Run the script to clear the logs
+    - User will be prompted to provide the BMC username, password, and IP address.
+```
+python3 smci_instinct_platform_amdgpu_power_drain.py
+```
+
+### Example of running on RHEL
+
+1.	Ensure Python with packages is installed on the system
+```
+sudo yum update && sudo yum install -y python3-requests
+```
+2.	Run the script to clear the logs
+    - User will be prompted to provide the BMC username, password, and IP address.
+```
+python3 smci_instinct_platform_amdgpu_power_drain.py
+```
+
+### Parameters
+
+| Parameter      | Description                                                                          |  
+|----------------|--------------------------------------------------------------------------------------|  
+| --debug        | Adding the --debug option will provide debug information and show the BMC password.  |  
+
+### Batch use
+
+To support batch use, user input can be replaced with environment variables set in the environment.
+
+| Parameter    | Description                         |  
+|--------------|-------------------------------------|  
+| BMC_IP       | IPv4 address of the BMC.            |  
+| BMC_USERNAME | Username for logging into the BMC.  |  
+| BMC_PASSWORD | Password used to log into the BMC.  |  
+
 ## BKC Update Script smci_instinct_platform_amdgpu_update_bkc.py
 
 Script updates the BKC on the DCGPU on the target system.  As part of
