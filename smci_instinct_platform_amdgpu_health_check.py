@@ -32,6 +32,7 @@ import time
 import json
 import argparse
 import requests
+import numbers
 from datetime import datetime
 from requests.adapters import HTTPAdapter
 from requests.packages.urllib3.util.retry import Retry
@@ -228,11 +229,215 @@ def authenticate(bmc_ip, bmc_username, bmc_password):
     return True
 
 
+def checkFan(bmc_ip, bmc_username, bmc_password):
+    """
+    Check the status of all the fans.  Returns number of failed fans or 0 if
+    no fans failed.
+    """
+
+    failingFan = 0
+
+    url = f"{PROTOCOL}://{bmc_ip}:{PORT}/redfish/v1/Chassis/1/Thermal"
+
+    log(f"Checking chassis fans")
+
+    try:
+        response = requests.get(
+            url, auth=(bmc_username, bmc_password), verify=False, timeout=10
+        )
+        response.raise_for_status()
+        data = response.json()
+    except requests.exceptions.RequestException as e:
+        print(f"[FAIL] Failed to retrieve thermal data: {e}")
+        failingFan += 1
+
+    dataList = data.get("Fans", {})
+
+    for fan in dataList:
+        name = fan.get("Name", "Unknown")
+        reading = fan.get("Reading", "Unknown")
+        health = fan.get("Status").get("Health", "Unknown")
+
+        if health != "OK":
+            print(
+                f"[FAIL] Name={name} Reading={reading}, "
+                f"Health={health}, "
+                f"ALERT fan health is {health}, please service chassis"
+            )
+            failingFan += 1
+        else:
+            if DEBUG:
+                print(f"[OK]   Name={name} Reading={reading}, Health={health}")
+
+    return failingFan
+
+
+def checkCpu(bmc_ip, bmc_username, bmc_password):
+    """
+    Check the health status of the CPUs.  Returns number of CPUs with failures
+    or 0 if no CPUs are in a bad state.
+    """
+
+    failingCpu = 0
+
+    log(f"Checking CPUs")
+
+    for cpu in range(1, 3):
+        url = f"{PROTOCOL}://{bmc_ip}:{PORT}/{REDFISH_SYSTEM_BMC}/Processors/{cpu}"
+
+        try:
+            response = requests.get(
+                url, auth=(bmc_username, bmc_password), verify=False, timeout=10
+            )
+            response.raise_for_status()
+            data = response.json()
+        except requests.exceptions.RequestException as e:
+            print(f"[FAIL] Failed to retrieve CPU {cpu} data: {e}")
+            failingCpu += 1
+            continue
+
+        if not data:
+            print("[FAIL] CPU {cpu} not found.")
+            failingCpu += 1
+            continue
+
+        if VERBOSE:
+            print(f"GPU {cpu} debug:")
+            print(json.dumps(data, indent=4))
+
+        manufacturer = data.get("Manufacturer", "Unknown")
+        model = data.get("Model", "Unknown")
+        version = data.get("Version", "Unknown")
+        totalMemorySizeMiB = data.get("MemorySummary").get(
+            "TotalMemorySizeMiB", "Unknown"
+        )
+        health = data.get("Status").get("Health", "Unknown")
+
+        if health != "OK":
+            print(
+                f"[FAIL] CPU={cpu} Manufacturer={manufacturer}, "
+                f"Model={model}, "
+                f"Version={version}, "
+                f"TotalMemorySizeMiB={totalMemorySizeMiB}, "
+                f"Health={health}, "
+                f"ALERT CPU health is {health}, please service motherboard"
+            )
+            failingCpu += 1
+        else:
+            if DEBUG:
+                print(
+                    f"[OK]   CPU={cpu} Manufacturer={manufacturer}, "
+                    f"Model={model}, "
+                    f"Version={version}, "
+                    f"TotalMemorySizeMiB={totalMemorySizeMiB}, "
+                    f"Health={health}"
+                )
+
+    return failingCpu
+
+
+def checkDimm(bmc_ip, bmc_username, bmc_password):
+    """
+    Check the health of all DIMMs and ensuring that the count is even.  Returns
+    number of failing DIMMs or 0 if no DIMMs have issues.  An additional
+    failure is logged if the number of DIMMs are not even.
+    """
+
+    failingDimm = 0
+    dimmUrl = f"{PROTOCOL}://{bmc_ip}:{PORT}/{REDFISH_SYSTEM_BMC}/Memory"
+
+    log(f"Checking DIMMs")
+
+    try:
+        response = http_request_with_retries(
+            "get", dimmUrl, auth=(bmc_username, bmc_password)
+        )
+        check_response_success(response, "Failed to get power state.")
+        resp = response.json()
+        dimmCount = resp.get("Members@odata.count", "Unknown")
+
+        if not isinstance(dimmCount, numbers.Number) or isinstance(dimmCount, bool):
+            log(f"Failed to read DIMM count.")
+            sys.exit(1)
+        else:
+            log(f"DIMM count: {dimmCount}")
+    except Exception as e:
+        log(f"Exception while reading DIMMs: {e}")
+        sys.exit(1)
+
+    if dimmCount % 2 != 0:
+        print(f"[FAIL] DIMM count not even, ALERT at least one DIMM is not seated")
+        failingDimm += 1
+
+    for dimm in range(1, dimmCount + 1):
+        url = f"{PROTOCOL}://{bmc_ip}:{PORT}/{REDFISH_SYSTEM_BMC}/Memory/{dimm}"
+
+        try:
+            response = requests.get(
+                url, auth=(bmc_username, bmc_password), verify=False, timeout=10
+            )
+            response.raise_for_status()
+            data = response.json()
+        except requests.exceptions.RequestException as e:
+            print(f"[FAIL] Failed to retrieve DIMM {dimm} data: {e}")
+            failingDimm += 1
+            continue
+
+        if not data:
+            print("[FAIL] DIMM {dimm} not found.")
+            failingDimm += 1
+            continue
+
+        deviceLocator = data.get("DeviceLocator", "Unknown")
+        capacityMiB = data.get("CapacityMiB", "Unknown")
+        memoryDeviceType = data.get("MemoryDeviceType", "Unknown")
+        operatingSpeedMhz = data.get("OperatingSpeedMhz", "Unknown")
+        manufacturer = data.get("Manufacturer", "Unknown")
+        partNumber = data.get("PartNumber", "Unknown")
+        serialNumber = data.get("SerialNumber", "Unknown")
+        health = data.get("Status").get("Health", "Unknown")
+        memoryLocation = data.get("MemoryLocation", "Unknown")
+
+        if VERBOSE:
+            print(f"DIMM {dimm} debug:")
+            print(json.dumps(data, indent=4))
+
+        if health != "OK":
+            print(
+                f"[FAIL] DIMM={dimm}. "
+                f"DeviceLocator={deviceLocator}, "
+                f"CapacityMiB={capacityMiB}, "
+                f"MemoryDeviceType={memoryDeviceType}, "
+                f"OperatingSpeedMhz={operatingSpeedMhz}, "
+                f"Manufacturer={manufacturer}, "
+                f"PartNumber={partNumber}, "
+                f"SerialNumber={serialNumber}, "
+                f"Health={health}, "
+                f"ALERT DIMM health is {health}, please service motherboard"
+            )
+            failingDimm += 1
+        else:
+            if DEBUG:
+                print(
+                    f"[OK]   DIMM={dimm}. "
+                    f"DeviceLocator={deviceLocator}, "
+                    f"OperatingSpeedMhz={operatingSpeedMhz}, "
+                    f"PartNumber={partNumber}, "
+                    f"SerialNumber={serialNumber}, "
+                    f"Health={health}"
+                )
+
+    return failingDimm
+
+
 def checkOam(bmc_ip, bmc_username, bmc_password):
     """
     Check the health of the OAM modules.
     """
+
     failingOam = 0
+
+    log(f"Checking OAMs")
 
     for oam in range(8):
         url = f"{PROTOCOL}://{bmc_ip}:{PORT}/redfish/v1/Chassis/OAM_{oam}"
@@ -282,6 +487,8 @@ def checkMemory(bmc_ip, bmc_username, bmc_password):
     Check the health of the HBM memory for each OAM. Modules are listed by GPU number, not OAM, this is not a one to one match.
     """
     failingGpu = 0
+
+    log(f"Checking OAM HBM")
 
     for gpu in range(8):
         url = f"{PROTOCOL}://{bmc_ip}:{PORT}/redfish/v1/Systems/UBB/Memory/GPU{gpu}"
@@ -1230,13 +1437,13 @@ def main():
     # 4. Check to make sure all PSU have power
     # ----------------------------------------------------------------
     if not check_power_supplies(bmc_ip, bmc_username, bmc_password):
-        sys.exit(1)
+        sys.exit(2)
 
     # ----------------------------------------------------------------
     # 5. Confirm connection to UBB
     # ----------------------------------------------------------------
     if not checkUbb(bmc_ip, bmc_username, bmc_password):
-        sys.exit(1)
+        sys.exit(5)
 
     # ----------------------------------------------------------------
     # 6. Get BKC version
@@ -1244,13 +1451,29 @@ def main():
     getBkcVersion(bmc_ip, bmc_username, bmc_password)
 
     # ----------------------------------------------------------------
-    # 7. Check the health of each OAM module and the modules RAM
+    # 7. Check the system fans
     # ----------------------------------------------------------------
-    failingOam = checkOam(bmc_ip, bmc_username, bmc_password)
-    failingGpu = checkMemory(bmc_ip, bmc_username, bmc_password)
-    if (failingOam > 0) or (failingGpu > 0):
+    if checkFan(bmc_ip, bmc_username, bmc_password) > 0:
+        print(f"Please service fan assembly")
+        sys.exit(3)
+
+    # ----------------------------------------------------------------
+    # 8. Check the health of each CPUs and DIMMs
+    # ----------------------------------------------------------------
+    if (checkCpu(bmc_ip, bmc_username, bmc_password) > 0) or (
+        checkDimm(bmc_ip, bmc_username, bmc_password) > 0
+    ):
+        print(f"Please service motherboard assembly")
+        sys.exit(4)
+
+    # ----------------------------------------------------------------
+    # 9. Check the health of each OAM module and the modules RAM
+    # ----------------------------------------------------------------
+    if (checkOam(bmc_ip, bmc_username, bmc_password) > 0) or (
+        checkMemory(bmc_ip, bmc_username, bmc_password) > 0
+    ):
         logsAllGet(bmc_ip, bmc_username, bmc_password)
-        sys.exit(1)
+        sys.exit(5)
 
     print(f"No erros found")
 
