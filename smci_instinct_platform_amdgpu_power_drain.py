@@ -743,6 +743,7 @@ def checkUbb(bmc_ip, bmc_username, bmc_password, max_attempts=2):
 
     if REDFISH_OEM == None:
         log("Unable to establish connection to the UBB.")
+        bmcReset(bmc_ip, bmc_username, bmc_password)
         log(f"Power cycling system before retry")
         systemPowerCycle(bmc_ip, bmc_username, bmc_password)
 
@@ -1467,12 +1468,17 @@ def main():
         sys.exit(4)
 
     # ----------------------------------------------------------------
-    # 9. Cycle power cycle to drain assembly power
+    # 9. Reboot the BMC to ensure it is in a good state
+    # ----------------------------------------------------------------
+    bmcReset(bmc_ip, bmc_username, bmc_password)
+
+    # ----------------------------------------------------------------
+    # 10. Cycle power cycle to drain assembly power
     # ----------------------------------------------------------------
     systemPowerCycle(bmc_ip, bmc_username, bmc_password)
 
     # ----------------------------------------------------------------
-    # 10. Check the health of each OAM module and the modules RAM
+    # 11. Check the health of each OAM module and the modules RAM
     # ----------------------------------------------------------------
     if (checkOam(bmc_ip, bmc_username, bmc_password) > 0) or (
         checkMemory(bmc_ip, bmc_username, bmc_password) > 0
