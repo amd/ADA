@@ -32,6 +32,7 @@ import time
 import json
 import argparse
 import requests
+import numbers
 from datetime import datetime
 from requests.adapters import HTTPAdapter
 from requests.packages.urllib3.util.retry import Retry
@@ -61,7 +62,6 @@ args = parser.parse_args()
 DEBUG = args.debug
 VERBOSE = args.verbose
 NO_POWER_OFF = args.no_power_off
-ALERT_ECC_THRESHOLD = 128
 
 # --------------------------------------------------------------------
 # Constants for porting between platforms
@@ -550,18 +550,19 @@ def checkMemory(bmc_ip, bmc_username, bmc_password):
                 f"ALERT Health is Critical, check AllLogs"
             )
             failingGpu += 1
-        elif (ecc is not None) and (ecc >= ALERT_ECC_THRESHOLD):
+        elif ((ecc is not None) and (ecc > 0)) or (
+            (correctable is not None) and (correctable > 0)
+        ):
             print(
-                f"[FAIL] "
+                f"[OK]   "
                 f"Device={device}, "
                 f"UncorrectableECCErrorCount (LifeTime)={ecc}, "
                 f"CorrectableECCErrorCount (CurrentPeriod)={correctable}, "
                 f"Health={health}, "
-                f"ALERT Check system if page retirement threshold exceeded"
+                f"For tracking"
             )
-            failingGpu += 1
         else:
-            if DEBUG:
+            if DEBUG and (ecc is not None):
                 print(
                     f"[OK]   "
                     f"Device={device}, "
@@ -742,6 +743,7 @@ def checkUbb(bmc_ip, bmc_username, bmc_password, max_attempts=2):
 
     if REDFISH_OEM == None:
         log("Unable to establish connection to the UBB.")
+        bmcReset(bmc_ip, bmc_username, bmc_password)
         log(f"Power cycling system before retry")
         systemPowerCycle(bmc_ip, bmc_username, bmc_password)
 

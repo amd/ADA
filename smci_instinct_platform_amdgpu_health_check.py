@@ -743,6 +743,7 @@ def checkUbb(bmc_ip, bmc_username, bmc_password, max_attempts=2):
 
     if REDFISH_OEM == None:
         log("Unable to establish connection to the UBB.")
+        bmcReset(bmc_ip, bmc_username, bmc_password)
         log(f"Power cycling system before retry")
         systemPowerCycle(bmc_ip, bmc_username, bmc_password)
 
