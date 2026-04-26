@@ -68,7 +68,8 @@ python3 smci_instinct_platform_amdgpu_alllogs_collection.py
 | Parameter      | Description                                                                          |  
 |----------------|--------------------------------------------------------------------------------------|  
 | --debug        | Adding the --debug option will provide debug information and show the BMC password.  |  
-| --no-power-off | Do not power off the system even if power cycle required                             |  
+| --no-power-off | Do not power off the system even if power cycle required.                            |  
+| --dimm-count   | Set the expected number of DIMMs for the system.                                     | 
 
 ### Batch use
 
@@ -136,7 +137,8 @@ python3 smci_instinct_platform_amdgpu_health_check.py
 | Parameter      | Description                                                                          |  
 |----------------|--------------------------------------------------------------------------------------|  
 | --debug        | Adding the --debug option will provide debug information and show the BMC password.  |  
-| --no-power-off | Do not power off the system even if power cycle required                             |  
+| --no-power-off | Do not power off the system even if power cycle required.                            |  
+| --dimm-count   | Set the expected number of DIMMs for the system.                                     | 
 
 ### Batch use
 
@@ -204,7 +206,8 @@ python3 smci_instinct_platform_amdgpu_clear_all_logs.py
 | Parameter      | Description                                                                          |  
 |----------------|--------------------------------------------------------------------------------------|  
 | --debug        | Adding the --debug option will provide debug information and show the BMC password.  |  
-| --no-power-off | Do not power off the system even if power cycle required                             |  
+| --no-power-off | Do not power off the system even if power cycle required.                            |  
+| --dimm-count   | Set the expected number of DIMMs for the system.                                     | 
 
 ### Batch use
 
@@ -272,6 +275,7 @@ python3 smci_instinct_platform_amdgpu_power_drain.py
 | Parameter      | Description                                                                          |  
 |----------------|--------------------------------------------------------------------------------------|  
 | --debug        | Adding the --debug option will provide debug information and show the BMC password.  |  
+| --dimm-count   | Set the expected number of DIMMs for the system.                                     | 
 
 ### Batch use
 
@@ -339,7 +343,8 @@ python3 smci_instinct_platform_amdgpu_update_bkc.py
 | Parameter      | Description                                                                          |  
 |----------------|--------------------------------------------------------------------------------------|  
 | --debug        | Adding the --debug option will provide debug information and show the BMC password.  |  
-| --no-power-off | Do not power off the system even if power cycle required                             |  
+| --no-power-off | Do not power off the system even if power cycle required.                            |  
+| --dimm-count   | Set the expected number of DIMMs for the system.                                     | 
 
 ### Batch use
 

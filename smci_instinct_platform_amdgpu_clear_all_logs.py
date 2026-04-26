@@ -58,10 +58,18 @@ parser.add_argument(
     action="store_true",
     help="Do not power off the system even if power cycle required",
 )
+parser.add_argument(
+    "-c",
+    "--dimm-count",
+    type=int,
+    default=24,
+    help="Set the expected number of DIMMs for the system",
+)
 args = parser.parse_args()
 DEBUG = args.debug
 VERBOSE = args.verbose
 NO_POWER_OFF = args.no_power_off
+EXPECTED_DIMM_COUNT = args.dimm_count
 
 # --------------------------------------------------------------------
 # Constants for porting between platforms
@@ -79,7 +87,8 @@ BUNDLE_ACTIVE = "bundle_active"
 PORT = 443
 PROTOCOL = "https"
 POWER_ON = {"Action": "Reset", "ResetType": "On"}
-POWER_OFF = {"Action": "Reset", "ResetType": "ForceOff"}
+POWER_OFF = {"Action": "Reset", "ResetType": "GracefulShutdown"}
+FORCE_OFF = {"Action": "Reset", "ResetType": "ForceOff"}
 
 # --------------------------------------------------------------------
 # Helper Functions
@@ -271,6 +280,60 @@ def checkFan(bmc_ip, bmc_username, bmc_password):
     return failingFan
 
 
+def checkSystem(bmc_ip, bmc_username, bmc_password):
+    """
+    Check the health status of the motherboard.  Returns number of part and serial number.
+    """
+
+    failingSystem = 0
+
+    log(f"Checking System")
+
+    url = f"{PROTOCOL}://{bmc_ip}:{PORT}/redfish/v1/Systems/1"
+
+    try:
+        response = requests.get(
+            url, auth=(bmc_username, bmc_password), verify=False, timeout=10
+        )
+        response.raise_for_status()
+        data = response.json()
+    except requests.exceptions.RequestException as e:
+        print(f"[FAIL] Failed to retrieve Systems/1 data: {e}")
+        failingSystem += 1
+
+    if not data:
+        print("[FAIL] Systems/1 not found.")
+        failingSystem += 1
+    else:
+        manufacturer = data.get("Manufacturer", "Unknown")
+        model = data.get("Model", "Unknown")
+        serialNumber = data.get("SerialNumber", "Unknown")
+        partNumber = data.get("PartNumber", "Unknown")
+        health = data.get("Status").get("Health", "Unknown")
+
+        if health != "OK":
+            print(
+                f"[FAIL] System Manufacturer={manufacturer}, "
+                f"Model={model}, "
+                f"SerialNumber={serialNumber}, "
+                f"PartNumber={partNumber}, "
+                f"Health={health}, "
+                f"ALERT CPU health is {health}, please service motherboard"
+            )
+            failingSystem += 1
+        else:
+            if DEBUG:
+                print(
+                    f"[OK]   System Manufacturer={manufacturer}, "
+                    f"Model={model}, "
+                    f"SerialNumber={serialNumber}, "
+                    f"PartNumber={partNumber}, "
+                    f"Health={health}"
+                )
+
+    return failingSystem
+
+
 def checkCpu(bmc_ip, bmc_username, bmc_password):
     """
     Check the health status of the CPUs.  Returns number of CPUs with failures
@@ -359,13 +422,16 @@ def checkDimm(bmc_ip, bmc_username, bmc_password):
             log(f"Failed to read DIMM count.")
             sys.exit(1)
         else:
-            log(f"DIMM count: {dimmCount}")
+            if DEBUG:
+                log(f"DIMM count: {dimmCount}")
     except Exception as e:
         log(f"Exception while reading DIMMs: {e}")
         sys.exit(1)
 
-    if dimmCount % 2 != 0:
-        print(f"[FAIL] DIMM count not even, ALERT at least one DIMM is not seated")
+    if dimmCount != EXPECTED_DIMM_COUNT:
+        print(
+            f"[FAIL] DIMM count not as expected, ALERT at least one DIMM is not seated"
+        )
         failingDimm += 1
 
     for dimm in range(1, dimmCount + 1):
@@ -429,12 +495,12 @@ def checkDimm(bmc_ip, bmc_username, bmc_password):
     return failingDimm
 
 
-def checkOam(bmc_ip, bmc_username, bmc_password):
+def checkModule(bmc_ip, bmc_username, bmc_password):
     """
     Check the health of the OAM modules.
     """
 
-    failingOam = 0
+    failingModule = 0
 
     log(f"Checking OAMs")
 
@@ -448,13 +514,13 @@ def checkOam(bmc_ip, bmc_username, bmc_password):
             response.raise_for_status()
             data = response.json()
         except requests.exceptions.RequestException as e:
-            print(f"[FAIL] Failed to retrieve OAM {oam} data: {e}")
-            failingOam += 1
+            print(f"[FAIL] Failed to retrieve OAM_{oam} data: {e}")
+            failingModule += 1
             continue
 
         if not data:
             print("[FAIL] OAM {oam} not found.")
-            failingOam += 1
+            failingModule += 1
             continue
 
         serialNumber = data.get("SerialNumber", "Unknown")
@@ -470,7 +536,7 @@ def checkOam(bmc_ip, bmc_username, bmc_password):
                 f"PartNumber={partNumber}, SKU={sku}, Health={health}, "
                 f"ALERT OAM health is critical, please pull AllLogs"
             )
-            failingGpu += 1
+            failingModule += 1
         else:
             if DEBUG:
                 print(
@@ -478,7 +544,112 @@ def checkOam(bmc_ip, bmc_username, bmc_password):
                     f"PartNumber={partNumber}, SKU={sku}, Health={health}"
                 )
 
-    return failingOam
+    log(f"Checking Retimers")
+
+    for retimer in range(8):
+        url = f"{PROTOCOL}://{bmc_ip}:{PORT}/redfish/v1/Chassis/RETIMER_{retimer}"
+
+        try:
+            response = requests.get(
+                url, auth=(bmc_username, bmc_password), verify=False, timeout=10
+            )
+            response.raise_for_status()
+            data = response.json()
+        except requests.exceptions.RequestException as e:
+            print(f"[FAIL] Failed to retrieve RETIMER_{retimer} data: {e}")
+            failingModule += 1
+            continue
+
+        if not data:
+            print("[FAIL] OAM {retimer} not found.")
+            failingModule += 1
+            continue
+
+        status = data.get("Status", [])
+        health = status.get("Health", "Unknown")
+        # healthRollUp = status.get("HealthRollUp", "Unknown")
+
+        if health == "Critical":
+            print(
+                f"[FAIL] RETIMER={retimer}, Health={health}, "
+                f"ALERT RETIMER health is critical, please pull AllLogs"
+            )
+            failingModule += 1
+        else:
+            if DEBUG:
+                print(f"[OK]   RETIMER={retimer}, Health={health}")
+
+    log(f"Checking EROT")
+
+    url = f"{PROTOCOL}://{bmc_ip}:{PORT}/redfish/v1/Chassis/EROT"
+
+    try:
+        response = requests.get(
+            url, auth=(bmc_username, bmc_password), verify=False, timeout=10
+        )
+        response.raise_for_status()
+        data = response.json()
+    except requests.exceptions.RequestException as e:
+        print(f"[FAIL] Failed to retrieve UBB data: {e}")
+        failingModule += 1
+
+    if not data:
+        print("[FAIL] UBB not found.")
+        failingModule += 1
+    else:
+        status = data.get("Status", [])
+        health = status.get("Health", "Unknown")
+        # healthRollUp = status.get("HealthRollUp", "Unknown")
+
+        if health == "Critical":
+            print(
+                f"[FAIL] EROT, Health={health}, "
+                f"ALERT EROT health is critical, please pull AllLogs"
+            )
+            failingModule += 1
+        else:
+            if DEBUG:
+                print(f"[OK]   EROT, Health={health}")
+
+    log(f"Checking UBB")
+
+    url = f"{PROTOCOL}://{bmc_ip}:{PORT}/redfish/v1/Chassis/UBB"
+
+    try:
+        response = requests.get(
+            url, auth=(bmc_username, bmc_password), verify=False, timeout=10
+        )
+        response.raise_for_status()
+        data = response.json()
+    except requests.exceptions.RequestException as e:
+        print(f"[FAIL] Failed to retrieve UBB data: {e}")
+        failingModule += 1
+
+    if not data:
+        print("[FAIL] UBB not found.")
+        failingModule += 1
+    else:
+        serialNumber = data.get("SerialNumber", "Unknown")
+        partNumber = data.get("PartNumber", "Unknown")
+        status = data.get("Status", [])
+        health = status.get("Health", "Unknown")
+        # healthRollUp = status.get("HealthRollUp", "Unknown")
+
+        if health == "Critical":
+            print(
+                f"[FAIL] UBB, SerialNumber={serialNumber}, "
+                f"PartNumber={partNumber}, Health={health}, "
+                f"ALERT UBB health is critical, please pull AllLogs"
+            )
+            failingModule += 1
+        else:
+            if DEBUG:
+                print(
+                    f"[OK]   UBB, SerialNumber={serialNumber}, "
+                    f"PartNumber={partNumber}, Health={health}"
+                )
+
+    return failingModule
 
 
 def checkMemory(bmc_ip, bmc_username, bmc_password):
@@ -541,14 +712,22 @@ def checkMemory(bmc_ip, bmc_username, bmc_password):
         ecc = lifetime.get("UncorrectableECCErrorCount", None)
 
         if health == "Critical":
-            print(
-                f"[FAIL] "
-                f"Device={device}, "
-                f"UncorrectableECCErrorCount (LifeTime)={ecc}, "
-                f"CorrectableECCErrorCount (CurrentPeriod)={correctable}, "
-                f"Health={health}, "
-                f"ALERT Health is Critical, check AllLogs"
-            )
+            if ecc is not None:
+                print(
+                    f"[FAIL] "
+                    f"Device={device}, "
+                    f"UncorrectableECCErrorCount (LifeTime)={ecc}, "
+                    f"CorrectableECCErrorCount (CurrentPeriod)={correctable}, "
+                    f"Health={health}, "
+                    f"ALERT Health is Critical, check AllLogs"
+                )
+            else:
+                print(
+                    f"[FAIL] "
+                    f"Device={device}, "
+                    f"Health={health}, "
+                    f"ALERT Health is Critical, check AllLogs"
+                )
             failingGpu += 1
         elif ((ecc is not None) and (ecc > 0)) or (
             (correctable is not None) and (correctable > 0)
@@ -562,14 +741,17 @@ def checkMemory(bmc_ip, bmc_username, bmc_password):
                 f"For tracking"
             )
         else:
-            if DEBUG and (ecc is not None):
-                print(
-                    f"[OK]   "
-                    f"Device={device}, "
-                    f"UncorrectableECCErrorCount (LifeTime)={ecc}, "
-                    f"CorrectableECCErrorCount (CurrentPeriod)={correctable}, "
-                    f"Health={health}"
-                )
+            if DEBUG:
+                if ecc is not None:
+                    print(
+                        f"[OK]   "
+                        f"Device={device}, "
+                        f"UncorrectableECCErrorCount (LifeTime)={ecc}, "
+                        f"CorrectableECCErrorCount (CurrentPeriod)={correctable}, "
+                        f"Health={health}"
+                    )
+                else:
+                    print(f"[OK]   " f"Device={device}, " f"Health={health}")
 
     return failingGpu
 
@@ -767,6 +949,47 @@ def checkUbb(bmc_ip, bmc_username, bmc_password, max_attempts=2):
     return True
 
 
+def assembly(bmc_ip, bmc_username, bmc_password):
+    """
+    Print assembly information.
+    """
+
+    failingAssembly = 0
+
+    url = f"{PROTOCOL}://{bmc_ip}:{PORT}/redfish/v1/Chassis/UBB/Assembly"
+
+    try:
+        response = requests.get(
+            url, auth=(bmc_username, bmc_password), verify=False, timeout=10
+        )
+        response.raise_for_status()
+        data = response.json()
+    except requests.exceptions.RequestException as e:
+        print(f"[FAIL] Failed to retrieve UBB/assembly data: {e}")
+        failingAssembly += 1
+
+    if not data:
+        print("[FAIL] Systems/1 not found.")
+        failingAssmebly += 1
+    else:
+        assemblies = data.get("Assemblies", {})[0]
+        name = assemblies.get("Name", "Unknown")
+        productionDate = assemblies.get("ProductionDate", "Unknown")
+        # serialNumber = assemblies.get("SerialNumber", "Unknown")
+        partNumber = assemblies.get("PartNumber", "Unknown")
+        # assemblyPartNumber = assemblies.get("Oem", {}).get("AssemblyPartNumber", "Unknown")
+        assemblySerialNumber = assemblies.get("Oem", {}).get(
+            "AssemblySerialNumber", "Unknown"
+        )
+        # orderablePartNumber = assemblies.get("Oem", {}).get("OrderablePartNumber", "Unknown")
+
+        log(
+            f"Assembly: Name={name}, ProductionDate={productionDate}, PartNumber={partNumber}, AssemblySerialNumber={assemblySerialNumber}"
+        )
+
+    return failingAssembly
+
+
 def getBmcVersion(bmc_ip, bmc_username, bmc_password):
     """
     Get the BMC version for the system.  This code is partner specific.
@@ -883,7 +1106,15 @@ def systemPowerOn(bmc_ip, bmc_username, bmc_password):
         sys.exit(1)
 
     log(f"Waiting for {dwell} seconds to confirm power is on")
-    time.sleep(dwell)
+    remaining_time = dwell
+
+    while remaining_time > 0:
+        print(f"\rRemaining time: {remaining_time:>3}s", end="")
+        sys.stdout.flush()
+        time.sleep(INTERVAL)
+        remaining_time -= INTERVAL
+
+    print(f"\rRemaining time:   0s\r", end="")
 
     bmc_url = f"{PROTOCOL}://{bmc_ip}:{PORT}/{REDFISH_SYSTEM_BMC}"
 
@@ -924,10 +1155,16 @@ def systemPowerOff(bmc_ip, bmc_username, bmc_password):
     Power off system using BMC Redfish.
     Host must be up for ForceOff or GracefulShutdown to work reliably.
     """
-    dwell = 20
+    off_dwell = 250
+    force_dwell = 20
+    INTERVAL = 3
+
     log("Powering system off")
 
     reset_url = f"{PROTOCOL}://{bmc_ip}:{PORT}/{REDFISH_SYSTEM_BMC}/Actions/ComputerSystem.Reset"
+    bmc_url = f"{PROTOCOL}://{bmc_ip}:{PORT}/{REDFISH_SYSTEM_BMC}"
+
+    # Try a normal power off
 
     try:
         response = http_request_with_retries(
@@ -941,10 +1178,59 @@ def systemPowerOff(bmc_ip, bmc_username, bmc_password):
         log(f"Exception while Host power off: {e}.  Please manually pull power at PDU.")
         sys.exit(1)
 
-    log(f"Waiting for {dwell} seconds to confirm power is off")
-    time.sleep(dwell)
+    log(f"Waiting for {off_dwell} seconds to confirm power is off")
+    remaining_time = off_dwell
 
-    bmc_url = f"{PROTOCOL}://{bmc_ip}:{PORT}/{REDFISH_SYSTEM_BMC}"
+    while remaining_time > 0:
+        print(f"\rRemaining time: {remaining_time:>3}s", end="")
+        sys.stdout.flush()
+        time.sleep(INTERVAL)
+        remaining_time -= INTERVAL
+
+    print(f"\rRemaining time:   0s\r", end="")
+
+    try:
+        response = http_request_with_retries(
+            "get", bmc_url, auth=(bmc_username, bmc_password)
+        )
+        check_response_success(
+            response, "Failed to get power state.  Please manually pull power at PDU."
+        )
+        resp = response.json()
+        powerState = resp.get("PowerState", "Unknown")
+        if powerState == "On":
+            log("Failed to power off system, forcing power off")
+        else:
+            log(f"System is {powerState}")
+            return
+    except Exception as e:
+        log(f"Exception while powering off system: {e}")
+        sys.exit(1)
+
+    # Try to force power off
+
+    try:
+        response = http_request_with_retries(
+            "post", reset_url, auth=(bmc_username, bmc_password), json=FORCE_OFF
+        )
+        check_response_success(
+            response, "Host power off failure. Please manually pull power at PDU."
+        )
+        task_response_text = response.text
+    except Exception as e:
+        log(f"Exception while Host power off: {e}.  Please manually pull power at PDU.")
+        sys.exit(1)
+
+    log(f"Waiting for {force_dwell} seconds to confirm power is off")
+    remaining_time = force_dwell
+
+    while remaining_time > 0:
+        print(f"\rRemaining time: {remaining_time:>3}s", end="")
+        sys.stdout.flush()
+        time.sleep(INTERVAL)
+        remaining_time -= INTERVAL
+
+    print(f"\rRemaining time:   0s\r", end="")
 
     try:
         response = http_request_with_retries(
@@ -1446,6 +1732,8 @@ def main():
     if not checkUbb(bmc_ip, bmc_username, bmc_password):
         sys.exit(5)
 
+    assembly(bmc_ip, bmc_username, bmc_password)
+
     # ----------------------------------------------------------------
     # 6. Get BKC version
     # ----------------------------------------------------------------
@@ -1461,8 +1749,10 @@ def main():
     # ----------------------------------------------------------------
     # 8. Check the health of each CPUs and DIMMs
     # ----------------------------------------------------------------
-    if (checkCpu(bmc_ip, bmc_username, bmc_password) > 0) or (
-        checkDimm(bmc_ip, bmc_username, bmc_password) > 0
+    if (
+        (checkSystem(bmc_ip, bmc_username, bmc_password) > 0)
+        or (checkCpu(bmc_ip, bmc_username, bmc_password) > 0)
+        or (checkDimm(bmc_ip, bmc_username, bmc_password) > 0)
     ):
         print(f"Please service motherboard assembly")
         sys.exit(4)
@@ -1480,7 +1770,7 @@ def main():
     # ----------------------------------------------------------------
     # 10. Check the health of each OAM module and the modules RAM
     # ----------------------------------------------------------------
-    if (checkOam(bmc_ip, bmc_username, bmc_password) > 0) or (
+    if (checkModule(bmc_ip, bmc_username, bmc_password) > 0) or (
         checkMemory(bmc_ip, bmc_username, bmc_password) > 0
     ):
         logsAllGet(bmc_ip, bmc_username, bmc_password)
