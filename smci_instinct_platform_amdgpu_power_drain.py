@@ -1716,18 +1716,28 @@ def main():
         sys.exit(1)
 
     # ----------------------------------------------------------------
-    # 3. Get BMC version
+    # 3. Reboot the BMC to ensure it is in a good state
+    # ----------------------------------------------------------------
+    bmcReset(bmc_ip, bmc_username, bmc_password)
+
+    # ----------------------------------------------------------------
+    # 4. Cycle power cycle to drain assembly power
+    # ----------------------------------------------------------------
+    systemPowerCycle(bmc_ip, bmc_username, bmc_password)
+
+    # ----------------------------------------------------------------
+    # 5. Get BMC version
     # ----------------------------------------------------------------
     getBmcVersion(bmc_ip, bmc_username, bmc_password)
 
     # ----------------------------------------------------------------
-    # 4. Check to make sure all PSU have power
+    # 6. Check to make sure all PSU have power
     # ----------------------------------------------------------------
     if not check_power_supplies(bmc_ip, bmc_username, bmc_password):
         sys.exit(2)
 
     # ----------------------------------------------------------------
-    # 5. Confirm connection to UBB
+    # 7. Confirm connection to UBB
     # ----------------------------------------------------------------
     if not checkUbb(bmc_ip, bmc_username, bmc_password):
         sys.exit(5)
@@ -1735,19 +1745,19 @@ def main():
     assembly(bmc_ip, bmc_username, bmc_password)
 
     # ----------------------------------------------------------------
-    # 6. Get BKC version
+    # 8. Get BKC version
     # ----------------------------------------------------------------
     getBkcVersion(bmc_ip, bmc_username, bmc_password)
 
     # ----------------------------------------------------------------
-    # 7. Check the system fans
+    # 9. Check the system fans
     # ----------------------------------------------------------------
     if checkFan(bmc_ip, bmc_username, bmc_password) > 0:
         print(f"Please service fan assembly")
         sys.exit(3)
 
     # ----------------------------------------------------------------
-    # 8. Check the health of each CPUs and DIMMs
+    # 10. Check the health of each CPUs and DIMMs
     # ----------------------------------------------------------------
     if (
         (checkSystem(bmc_ip, bmc_username, bmc_password) > 0)
@@ -1756,16 +1766,6 @@ def main():
     ):
         print(f"Please service motherboard assembly")
         sys.exit(4)
-
-    # ----------------------------------------------------------------
-    # 9. Reboot the BMC to ensure it is in a good state
-    # ----------------------------------------------------------------
-    bmcReset(bmc_ip, bmc_username, bmc_password)
-
-    # ----------------------------------------------------------------
-    # 10. Cycle power cycle to drain assembly power
-    # ----------------------------------------------------------------
-    systemPowerCycle(bmc_ip, bmc_username, bmc_password)
 
     # ----------------------------------------------------------------
     # 11. Check the health of each OAM module and the modules RAM
