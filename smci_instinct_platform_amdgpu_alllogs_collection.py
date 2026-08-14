@@ -57,6 +57,11 @@ parser.add_argument(
     help="Do not power off the system even if power cycle required",
 )
 parser.add_argument(
+    "--bypass-hw-checks",
+    action="store_true",
+    help="Bypass all checks for hardware status (PS, fans, etc.)",
+)
+parser.add_argument(
     "-c",
     "--dimm-count",
     type=int,
@@ -68,6 +73,12 @@ DEBUG = args.debug
 VERBOSE = args.verbose
 NO_POWER_OFF = args.no_power_off
 EXPECTED_DIMM_COUNT = args.dimm_count
+BYPASS_HW_CHECKS = args.bypass_hw_checks
+
+# do not power off bypass power checks on
+if BYPASS_HW_CHECKS:
+   NO_POWER_OFF = True
+
 
 # --------------------------------------------------------------------
 # Constants for porting between platforms
@@ -1718,10 +1729,14 @@ def main():
     # ----------------------------------------------------------------
     getBmcVersion(bmc_ip, bmc_username, bmc_password)
 
+    # Let the user know if hardware checks are being bypassed
+    if BYPASS_HW_CHECKS: 
+        log("Bypassing hardware checks")
+
     # ----------------------------------------------------------------
     # 4. Check to make sure all PSU have power
     # ----------------------------------------------------------------
-    if not check_power_supplies(bmc_ip, bmc_username, bmc_password):
+    if not BYPASS_HW_CHECKS and not check_power_supplies(bmc_ip, bmc_username, bmc_password):
         sys.exit(2)
 
     # ----------------------------------------------------------------
@@ -1740,14 +1755,14 @@ def main():
     # ----------------------------------------------------------------
     # 7. Check the system fans
     # ----------------------------------------------------------------
-    if checkFan(bmc_ip, bmc_username, bmc_password) > 0:
+    if not BYPASS_HW_CHECKS and checkFan(bmc_ip, bmc_username, bmc_password) > 0:
         print(f"Please service fan assembly")
         sys.exit(3)
 
     # ----------------------------------------------------------------
     # 8. Check the health of each CPUs and DIMMs
     # ----------------------------------------------------------------
-    if (
+    if not BYPASS_HW_CHECKS and (
         (checkSystem(bmc_ip, bmc_username, bmc_password) > 0)
         or (checkCpu(bmc_ip, bmc_username, bmc_password) > 0)
         or (checkDimm(bmc_ip, bmc_username, bmc_password) > 0)
