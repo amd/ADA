@@ -1,10 +1,11 @@
 module silogen/scrapefish
 
-go 1.23.1
+go 1.24
 
 replace github.com/nod-ai/ADA/redfish-exporter => ./
 
 require (
+	github.com/gorilla/mux v1.8.1
 	github.com/joho/godotenv v1.5.1
 	github.com/nod-ai/ADA/redfish-exporter v0.0.0-20241002210630-2ef2d1070d90
 	github.com/prometheus/client_golang v1.20.4
@@ -15,8 +16,8 @@ require (
 require (
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
-	github.com/gorilla/mux v1.8.1 // indirect
-	github.com/klauspost/compress v1.17.9 // indirect
+	github.com/klauspost/compress v1.18.7 // indirect
+	github.com/kr/text v0.2.0 // indirect
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
 	github.com/prometheus/client_model v0.6.1 // indirect
 	github.com/prometheus/common v0.55.0 // indirect
